@@ -33,11 +33,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=False,
-        allow_methods=["GET"],
+        allow_methods=["GET", "POST"],
         allow_headers=["Content-Type"],
     )
     application.include_router(
-        create_api_router(include_diagnostics=settings.environment in {"development", "testing"}),
+        create_api_router(include_development_routes=settings.environment in {"development", "testing"}),
         prefix="/api/v1",
     )
 

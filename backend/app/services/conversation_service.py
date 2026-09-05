@@ -1,34 +1,10 @@
-"""Normalize supplied conversation requirements without interpreting speech or text."""
+"""Normalize structured facts and deterministically parse explicitly labeled text."""
 
-from pydantic import BaseModel, ConfigDict, Field
-
-
-class CustomerRequirements(BaseModel):
-    """Known customer needs; blanks and None mean information is not yet known."""
-
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, frozen=True)
-
-    product_category: str = ""
-    service_type: str = ""
-    product_count: int | None = Field(default=None, ge=0, strict=True)
-    image_count: int | None = Field(default=None, ge=0, strict=True)
-    deadline: str = ""
-    purpose: str = ""
-
-
-class ConversationInput(BaseModel):
-    """Adapter input; extracted_information must already contain structured facts.
-
-    Transcript and messages are accepted for future processors, but this initial
-    layer does not extract facts from them. Deadline remains customer-provided
-    text until a future workflow resolves its date and time zone.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    transcript: str = ""
-    customer_messages: tuple[str, ...] = ()
-    extracted_information: CustomerRequirements = Field(default_factory=CustomerRequirements)
+import re
+from app.schemas.conversation import (
+    ConversationInput, CustomerRequirements, ExtractedConversation, ProcessConversationRequest,
+)
+from app.schemas.customer import CustomerCreate
 
 
 class ConversationService:
@@ -37,3 +13,43 @@ class ConversationService:
     def extract_requirements(self, conversation: ConversationInput) -> CustomerRequirements:
         """Normalize the supplied facts; raw conversation text is not analyzed."""
         return CustomerRequirements.model_validate(conversation.extracted_information.model_dump())
+
+    def extract_from_transcript(self, transcript: str) -> ExtractedConversation:
+        """Parse labeled facts separated by semicolons/newlines; never guess prose.
+
+        Supported labels are customer/name, email, phone, business name, industry,
+        product category, service type, product count, image count, deadline, and
+        purpose (underscores also accepted). Conflicting duplicates are rejected.
+        Unrecognized text remains available in the stored original transcript.
+        """
+        transcript = ProcessConversationRequest(transcript=transcript).transcript
+        fields: dict[str, str] = {}
+        supported = {
+            "name", "customer_name", "email", "phone", "business_name", "industry",
+            "product_category", "service_type", "product_count", "image_count", "deadline", "purpose",
+        }
+        for part in re.split(r"[;\n]", transcript):
+            label, separator, value = part.partition(":")
+            key = label.strip().lower().replace(" ", "_")
+            if not separator or key not in supported:
+                continue
+            key = "name" if key == "customer_name" else key
+            value = value.strip()
+            if not value:
+                continue
+            if key in fields and fields[key] != value:
+                raise ValueError("Conflicting labeled conversation facts")
+            fields[key] = value
+        requirements: dict[str, object] = {
+            key: fields[key] for key in CustomerRequirements.model_fields if key in fields
+        }
+        for key in ("product_count", "image_count"):
+            if key in requirements:
+                raw = str(requirements[key])
+                if not re.fullmatch(r"[0-9]{1,10}", raw) or int(raw) > 2147483647:
+                    raise ValueError("Labeled counts must be nonnegative PostgreSQL integers")
+                requirements[key] = int(raw)
+        customer = {key: fields[key] for key in CustomerCreate.model_fields if key in fields}
+        customer.setdefault("name", "Unidentified customer")
+        normalized = self.extract_requirements(ConversationInput(extracted_information=requirements))
+        return ExtractedConversation(customer=CustomerCreate(**customer), requirements=normalized)

@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from uuid import UUID
 
 from pydantic import AnyHttpUrl, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -23,9 +24,15 @@ class Settings(BaseSettings):
     supabase_url: AnyHttpUrl | None = None
     supabase_key: SecretStr = SecretStr("")
     supabase_timeout_seconds: float = Field(default=10, gt=0, le=60)
+    agent_company_id: UUID | None = None
     # Reserved for future integrations.
     retell_api_key: SecretStr = SecretStr("")
     openai_api_key: SecretStr = SecretStr("")
+
+    @field_validator("agent_company_id", mode="before")
+    @classmethod
+    def empty_agent_company_id(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
 
     @field_validator("supabase_url", mode="before")
     @classmethod

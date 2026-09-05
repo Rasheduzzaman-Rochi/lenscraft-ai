@@ -1,1 +1,1 @@
-"""Reserved for future request and response schemas."""
+"""Validated API, conversation, and persistence data contracts."""

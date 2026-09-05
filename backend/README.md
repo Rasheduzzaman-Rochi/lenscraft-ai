@@ -3,12 +3,12 @@
 FastAPI foundation for Python 3.12+, with a versioned liveness endpoint,
 environment configuration, CORS, JSON logging, Docker support, and a reusable
 Supabase client. SQL migrations live in `database/migrations/`. Authentication,
-ORM models, and persistence workflows are not implemented. The initial agent
+ORM models are not implemented. The initial agent
 service layer prepares requirements, lead drafts, and quote requests without
 external calls; see [service interfaces and examples](app/services/README.md).
 The [repository layer](app/repositories/README.md) provides tenant-scoped Supabase
-operations for customers, leads, calls, projects, and quotes. Services and routes
-are not yet wired to these repositories.
+operations for customers, leads, calls, projects, and quotes. The transcript lead
+processing endpoint connects the API to these repositories through a workflow service.
 
 ## Install and run locally
 
@@ -67,6 +67,7 @@ Settings are cached per process; restart after configuration changes.
 | `SUPABASE_URL` | Empty | Supabase project HTTP(S) URL |
 | `SUPABASE_KEY` | Empty | Server-only Supabase secret or legacy service_role key |
 | `SUPABASE_TIMEOUT_SECONDS` | `10` | HTTP timeout per operation, greater than 0 and at most 60 seconds |
+| `AGENT_COMPANY_ID` | Empty | Existing company UUID for development/testing transcript processing |
 | `RETELL_API_KEY` | Empty | Reserved Retell credential |
 | `OPENAI_API_KEY` | Empty | Reserved OpenAI credential |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL` |
@@ -79,7 +80,7 @@ Environment and log-level values are case-sensitive. Unknown dotenv fields are
 ignored. Blank values do not fall back to defaults for required configuration.
 
 The example permits `http://localhost:3000`. Set exact HTTPS frontend origins for
-production, e.g. `CORS_ORIGINS=["https://studio.example.com"]`. Only GET and the
+production, e.g. `CORS_ORIGINS=["https://studio.example.com"]`. GET, POST, and the
 Content-Type header are allowed; credentialed CORS is disabled. Extend this
 policy when additional endpoints are implemented.
 
@@ -151,6 +152,8 @@ Keep the development server bound to localhost.
 
 ## Docker
 
+For the transcript workflow, see [lead processing setup](../docs/lead-processing.md).
+
 From the repository root, after creating `backend/.env`:
 
 ```sh
@@ -187,11 +190,13 @@ python -m unittest discover -s tests -v
 | `app/api/v1/router.py` | Aggregates version-one endpoint routers |
 | `app/api/v1/routes/health.py` | Implements the liveness endpoint |
 | `app/api/v1/routes/database.py` | Development-only database count diagnostic and sanitized failures |
+| `app/api/v1/routes/agent.py` | Transcript processing endpoint and workflow error mapping |
 | `app/services/__init__.py` | Marks the independent business service package |
 | `app/services/agent_service.py` | Coordinates explicitly requested service actions |
 | `app/services/conversation_service.py` | Normalizes supplied customer requirements |
 | `app/services/lead_service.py` | Prepares unsaved leads and validated partial updates |
 | `app/services/quote_service.py` | Prepares quotes with an injectable pricing interface |
+| `app/services/lead_processing_service.py` | Coordinates customer, lead, project, and call persistence |
 | `app/services/README.md` | Service usage, contracts, and future integration flow |
 | `app/repositories/` | Async persistence adapters, validated inputs, and storage errors |
 | `app/repositories/README.md` | Repository interfaces, tenant contracts, and usage |
@@ -199,7 +204,7 @@ python -m unittest discover -s tests -v
 | `app/database/supabase.py` | Reusable Supabase client, HTTP timeout, and connection cleanup |
 | `database/migrations/*.sql` | Tenant schema, indexes, triggers, and read policies |
 | `app/models/__init__.py` | Reserves the model package without defining models |
-| `app/schemas/__init__.py` | Reserves the API schema package |
+| `app/schemas/` | Shared Pydantic conversation, customer, lead, project, and call contracts |
 | `app/utils/__init__.py` | Reserves the shared utilities package |
 | Other `__init__.py` files | Mark `app`, `core`, `api`, `api/v1`, and `routes` as Python packages |
 | `.env.example` | Documents configuration without credentials |
@@ -211,4 +216,5 @@ python -m unittest discover -s tests -v
 | `tests/test_database.py` | Tests actual SDK requests with mock HTTP responses, client reuse, errors, and environment gating |
 | `tests/test_services.py` | Verifies dispatch, draft updates, tenant checks, and deferred pricing |
 | `tests/test_repositories.py` | Verifies real SDK request shapes, tenant filters, validation, and errors with mock HTTP |
+| `tests/test_lead_processing.py` | Exercises the full HTTP workflow, linking, failures, validation, and environment guards |
 | `README.md` | Installation, configuration, execution, and file reference |

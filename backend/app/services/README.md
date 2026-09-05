@@ -1,7 +1,9 @@
 # Agent service layer
 
-This layer accepts structured commands and prepares in-memory results. It has no
-FastAPI route, Retell, LLM, or database dependencies. It uses the existing Pydantic
+The original four services accept structured commands and prepare in-memory
+results. The new `LeadProcessingService` coordinates repository writes for
+`POST /api/v1/agent/process`. Services do not issue database queries or call
+Retell/LLMs. This layer uses the existing Pydantic
 installation for validation and Python Decimal for monetary values.
 
 | Module | Responsibility |
@@ -10,6 +12,7 @@ installation for validation and Python Decimal for monetary values.
 | `conversation_service.py` | Accept transcripts, customer messages, and extracted facts; return normalized requirements. Raw text extraction is intentionally a placeholder. |
 | `lead_service.py` | Create unsaved lead drafts, validate partial updates, and produce SQL-column-compatible payloads. |
 | `quote_service.py` | Prepare quote requests and delegate to the `PricingCalculator` protocol when supplied. |
+| `lead_processing_service.py` | Extract labeled transcript facts, validate all write inputs, and call the four repositories in order. |
 
 ## Example
 
@@ -74,7 +77,10 @@ Blank strings and null counts indicate unknown requirements; zero is preserved
 when explicitly supplied. Counts reject negative numbers, booleans, and numeric
 strings. Deadlines remain normalized text and need timezone-aware interpretation
 before a future project write. No service attempts to interpret transcripts or
-customer messages yet.
+customer messages through `extract_requirements`. The separate
+`extract_from_transcript` method recognizes explicit labels separated by newlines
+or semicolons. It is a deterministic parser, not general natural-language extraction.
+See [workflow setup and limits](../../../../docs/lead-processing.md).
 
 ## Verification
 

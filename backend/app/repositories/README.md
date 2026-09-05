@@ -3,7 +3,8 @@
 Repositories own persistence queries. Services decide what should happen; these
 adapters validate write shapes, scope queries, and communicate with Supabase.
 They do not implement pricing, conversation analysis, or workflow transitions.
-Existing services and API routes have not been wired to these adapters yet.
+`LeadProcessingService` now uses the customer, lead, project, and call adapters
+for `POST /api/v1/agent/process`. Quote persistence is not wired to an API yet.
 
 ## Interfaces
 
