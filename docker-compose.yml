@@ -1,0 +1,6 @@
+name: lenscraft-ai
+
+# Structural placeholder only. Add frontend and backend services with their
+# Dockerfiles, environment mappings, and health checks during implementation.
+# PostgreSQL will be provided by Supabase.
+services: {}
