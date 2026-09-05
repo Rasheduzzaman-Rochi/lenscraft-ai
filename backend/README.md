@@ -3,7 +3,12 @@
 FastAPI foundation for Python 3.12+, with a versioned liveness endpoint,
 environment configuration, CORS, JSON logging, Docker support, and a reusable
 Supabase client. SQL migrations live in `database/migrations/`. Authentication,
-ORM models, and business logic are not implemented.
+ORM models, and persistence workflows are not implemented. The initial agent
+service layer prepares requirements, lead drafts, and quote requests without
+external calls; see [service interfaces and examples](app/services/README.md).
+The [repository layer](app/repositories/README.md) provides tenant-scoped Supabase
+operations for customers, leads, calls, projects, and quotes. Services and routes
+are not yet wired to these repositories.
 
 ## Install and run locally
 
@@ -182,7 +187,14 @@ python -m unittest discover -s tests -v
 | `app/api/v1/router.py` | Aggregates version-one endpoint routers |
 | `app/api/v1/routes/health.py` | Implements the liveness endpoint |
 | `app/api/v1/routes/database.py` | Development-only database count diagnostic and sanitized failures |
-| `app/services/__init__.py` | Reserves the services package |
+| `app/services/__init__.py` | Marks the independent business service package |
+| `app/services/agent_service.py` | Coordinates explicitly requested service actions |
+| `app/services/conversation_service.py` | Normalizes supplied customer requirements |
+| `app/services/lead_service.py` | Prepares unsaved leads and validated partial updates |
+| `app/services/quote_service.py` | Prepares quotes with an injectable pricing interface |
+| `app/services/README.md` | Service usage, contracts, and future integration flow |
+| `app/repositories/` | Async persistence adapters, validated inputs, and storage errors |
+| `app/repositories/README.md` | Repository interfaces, tenant contracts, and usage |
 | `app/database/__init__.py` | Marks the database connectivity package |
 | `app/database/supabase.py` | Reusable Supabase client, HTTP timeout, and connection cleanup |
 | `database/migrations/*.sql` | Tenant schema, indexes, triggers, and read policies |
@@ -197,4 +209,6 @@ python -m unittest discover -s tests -v
 | `requirements-dev.txt` | Adds the HTTP test client to runtime dependencies |
 | `tests/test_foundation.py` | Verifies health, routing, CORS, settings, and JSON logs |
 | `tests/test_database.py` | Tests actual SDK requests with mock HTTP responses, client reuse, errors, and environment gating |
+| `tests/test_services.py` | Verifies dispatch, draft updates, tenant checks, and deferred pricing |
+| `tests/test_repositories.py` | Verifies real SDK request shapes, tenant filters, validation, and errors with mock HTTP |
 | `README.md` | Installation, configuration, execution, and file reference |

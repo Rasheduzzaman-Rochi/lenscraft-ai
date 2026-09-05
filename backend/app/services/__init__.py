@@ -1,1 +1,1 @@
-"""Reserved for future services and integrations."""
+"""Pure conversation, lead, and quote services coordinated by AgentService."""
