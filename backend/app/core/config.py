@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import AnyHttpUrl, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,11 +20,24 @@ class Settings(BaseSettings):
     environment: Literal["development", "testing", "staging", "production"] = "development"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     cors_origins: list[str] = Field(default_factory=list)
-    # Reserved settings only; no external clients are initialized.
-    supabase_url: str = ""
+    supabase_url: AnyHttpUrl | None = None
     supabase_key: SecretStr = SecretStr("")
+    supabase_timeout_seconds: float = Field(default=10, gt=0, le=60)
+    # Reserved for future integrations.
     retell_api_key: SecretStr = SecretStr("")
     openai_api_key: SecretStr = SecretStr("")
+
+    @field_validator("supabase_url", mode="before")
+    @classmethod
+    def empty_supabase_url(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @field_validator("supabase_url")
+    @classmethod
+    def validate_supabase_url(cls, value: AnyHttpUrl | None) -> AnyHttpUrl | None:
+        if value and (value.username or value.password or value.query or value.fragment):
+            raise ValueError("SUPABASE_URL must not contain credentials, query parameters, or fragments")
+        return value
 
 
 @lru_cache

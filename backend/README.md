@@ -1,9 +1,9 @@
 # LensCraft AI backend
 
 FastAPI foundation for Python 3.12+, with a versioned liveness endpoint,
-environment configuration, CORS, JSON logging, and Docker support.
-Database models, integration clients, authentication, and business logic are not
-implemented.
+environment configuration, CORS, JSON logging, Docker support, and a reusable
+Supabase client. SQL migrations live in `database/migrations/`. Authentication,
+ORM models, and business logic are not implemented.
 
 ## Install and run locally
 
@@ -59,14 +59,16 @@ Settings are cached per process; restart after configuration changes.
 | --- | --- | --- |
 | `APP_NAME` | `lenscraft-backend` | FastAPI application title |
 | `ENVIRONMENT` | `development` | `development`, `testing`, `staging`, or `production` |
-| `SUPABASE_URL` | Empty | Reserved Supabase URL |
-| `SUPABASE_KEY` | Empty | Reserved server-side Supabase key |
+| `SUPABASE_URL` | Empty | Supabase project HTTP(S) URL |
+| `SUPABASE_KEY` | Empty | Server-only Supabase secret or legacy service_role key |
+| `SUPABASE_TIMEOUT_SECONDS` | `10` | HTTP timeout per operation, greater than 0 and at most 60 seconds |
 | `RETELL_API_KEY` | Empty | Reserved Retell credential |
 | `OPENAI_API_KEY` | Empty | Reserved OpenAI credential |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL` |
 | `CORS_ORIGINS` | `[]` | JSON array of allowed browser origins |
 
-Integration fields may remain empty. Secret fields use Pydantic `SecretStr` to
+Supabase fields may remain empty for health-only startup; the database diagnostic
+returns 503 until both are populated. Secret fields use Pydantic `SecretStr` to
 mask their representations. Never log credentials or complete settings objects.
 Environment and log-level values are case-sensitive. Unknown dotenv fields are
 ignored. Blank values do not fall back to defaults for required configuration.
@@ -79,6 +81,68 @@ policy when additional endpoints are implemented.
 Logs go to stdout as JSON lines containing UTC timestamp, level, logger, service,
 and message. Startup includes environment; exception records include tracebacks.
 Uvicorn loggers use this format after application startup.
+
+## Supabase connection and diagnostic
+
+The official supabase-py library is installed under the PyPI name `supabase` and
+is pinned in `requirements.txt`. From `backend/`:
+
+```sh
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+Create `.env` from `.env.example` if it does not exist, then set:
+
+```dotenv
+ENVIRONMENT=development
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_KEY=your-server-only-secret-or-service-role-key
+SUPABASE_TIMEOUT_SECONDS=10
+```
+
+Apply the SQL files in `database/migrations/` in filename order to your Supabase
+project as the trusted migration owner. This backend does not apply migrations.
+The migrations deny anonymous table access, so a publishable/anon key cannot run
+this diagnostic. The server key bypasses RLS and counts all companies; keep it
+out of the frontend and version control. Future tenant endpoints must enforce
+authorization before using this privileged client.
+
+`app/database/supabase.py` reads the validated settings and initializes a shared
+client on first use through `get_supabase_client()`. The exported
+`supabase_client` instance is initially `None`; import the accessor to obtain it.
+A lock prevents duplicate initialization. HTTP connections are reused and closed
+at application shutdown. Session persistence and automatic token refresh are
+disabled; never sign a user into this shared server client. Restart the process
+after changing credentials.
+
+```sh
+python -m uvicorn app.main:app --reload
+```
+
+From another terminal:
+
+```sh
+curl -i http://127.0.0.1:8000/api/v1/test/database
+```
+
+Example response (the count reflects your database):
+
+```json
+{"database":"connected","companies_count":0}
+```
+
+The synchronous endpoint runs in FastAPI's thread pool and requests an exact
+count using a HEAD request to `public.companies`; it does not download company
+rows or infer counts from the API's row limit. Responses are not cacheable.
+Missing credentials, network failures, invalid keys, missing migrations, or denied
+permissions return 503 with a sanitized message. A missing count returns 502.
+Provider error bodies and credentials are not included in diagnostic logs.
+
+The unauthenticated diagnostic is mounted only in `development` and `testing`.
+It returns 404 and is absent from OpenAPI in `staging` and `production` to avoid
+exposing tenant totals. `/api/v1/health` remains available in every environment.
+Keep the development server bound to localhost.
 
 ## Docker
 
@@ -117,8 +181,11 @@ python -m unittest discover -s tests -v
 | `app/core/security.py` | Placeholder for future security utilities |
 | `app/api/v1/router.py` | Aggregates version-one endpoint routers |
 | `app/api/v1/routes/health.py` | Implements the liveness endpoint |
+| `app/api/v1/routes/database.py` | Development-only database count diagnostic and sanitized failures |
 | `app/services/__init__.py` | Reserves the services package |
-| `app/database/__init__.py` | Reserves the database connectivity package |
+| `app/database/__init__.py` | Marks the database connectivity package |
+| `app/database/supabase.py` | Reusable Supabase client, HTTP timeout, and connection cleanup |
+| `database/migrations/*.sql` | Tenant schema, indexes, triggers, and read policies |
 | `app/models/__init__.py` | Reserves the model package without defining models |
 | `app/schemas/__init__.py` | Reserves the API schema package |
 | `app/utils/__init__.py` | Reserves the shared utilities package |
@@ -129,4 +196,5 @@ python -m unittest discover -s tests -v
 | `requirements.txt` | Pinned runtime dependencies including transitive dependencies |
 | `requirements-dev.txt` | Adds the HTTP test client to runtime dependencies |
 | `tests/test_foundation.py` | Verifies health, routing, CORS, settings, and JSON logs |
+| `tests/test_database.py` | Tests actual SDK requests with mock HTTP responses, client reuse, errors, and environment gating |
 | `README.md` | Installation, configuration, execution, and file reference |

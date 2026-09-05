@@ -1,1 +1,1 @@
-"""Reserved for future database connectivity."""
+"""Server-side database clients and connection lifecycle."""

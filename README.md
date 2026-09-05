@@ -48,9 +48,12 @@ loaded by the backend. Only explicitly public values may use `NEXT_PUBLIC_`.
 ## Project status
 
 The backend foundation includes `/api/v1/health`, environment settings, CORS,
-JSON logging, tests, and a Dockerfile. Frontend and shared documentation remain
+JSON logging, Supabase connectivity, tests, and a Dockerfile. Frontend and shared documentation remain
 skeletons. `docker-compose.yml` is an empty Compose placeholder; use the backend
-README for standalone Docker commands. Supabase integration is not implemented.
+README for standalone Docker commands and `/api/v1/test/database` setup.
+SQL migrations are available in `backend/database/migrations/`; applying them
+to Supabase is a separate step. The database diagnostic is available only in
+development and testing.
 
 Further production work includes authentication, database access controls,
 migrations, integration tests, monitoring, backup procedures, and platform-level
