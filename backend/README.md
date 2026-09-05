@@ -9,6 +9,8 @@ external calls; see [service interfaces and examples](app/services/README.md).
 The [repository layer](app/repositories/README.md) provides tenant-scoped Supabase
 operations for customers, leads, calls, projects, and quotes. The transcript lead
 processing endpoint connects the API to these repositories through a workflow service.
+The [pricing endpoint](../docs/pricing.md) calculates quotes from the company's
+service catalog and stored pricing rules, without saving quote records.
 
 ## Install and run locally
 
@@ -191,11 +193,13 @@ python -m unittest discover -s tests -v
 | `app/api/v1/routes/health.py` | Implements the liveness endpoint |
 | `app/api/v1/routes/database.py` | Development-only database count diagnostic and sanitized failures |
 | `app/api/v1/routes/agent.py` | Transcript processing endpoint and workflow error mapping |
+| `app/api/v1/routes/quotes.py` | Validated quote calculation endpoint |
 | `app/services/__init__.py` | Marks the independent business service package |
 | `app/services/agent_service.py` | Coordinates explicitly requested service actions |
 | `app/services/conversation_service.py` | Normalizes supplied customer requirements |
 | `app/services/lead_service.py` | Prepares unsaved leads and validated partial updates |
 | `app/services/quote_service.py` | Prepares quotes with an injectable pricing interface |
+| `app/services/pricing_engine.py` | Pure fixed/per-image and add-on calculations |
 | `app/services/lead_processing_service.py` | Coordinates customer, lead, project, and call persistence |
 | `app/services/README.md` | Service usage, contracts, and future integration flow |
 | `app/repositories/` | Async persistence adapters, validated inputs, and storage errors |
@@ -217,4 +221,5 @@ python -m unittest discover -s tests -v
 | `tests/test_services.py` | Verifies dispatch, draft updates, tenant checks, and deferred pricing |
 | `tests/test_repositories.py` | Verifies real SDK request shapes, tenant filters, validation, and errors with mock HTTP |
 | `tests/test_lead_processing.py` | Exercises the full HTTP workflow, linking, failures, validation, and environment guards |
+| `tests/test_pricing.py` | Tests stored-rule calculations, configuration failures, and tenant filters |
 | `README.md` | Installation, configuration, execution, and file reference |

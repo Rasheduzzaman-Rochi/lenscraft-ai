@@ -12,6 +12,7 @@ installation for validation and Python Decimal for monetary values.
 | `conversation_service.py` | Accept transcripts, customer messages, and extracted facts; return normalized requirements. Raw text extraction is intentionally a placeholder. |
 | `lead_service.py` | Create unsaved lead drafts, validate partial updates, and produce SQL-column-compatible payloads. |
 | `quote_service.py` | Prepare quote requests and delegate to the `PricingCalculator` protocol when supplied. |
+| `pricing_engine.py` | Calculate fixed/per-image subtotals and named add-ons from validated database rules. |
 | `lead_processing_service.py` | Extract labeled transcript facts, validate all write inputs, and call the four repositories in order. |
 
 ## Example
@@ -72,6 +73,10 @@ inputs and related IDs, and calculate a `PriceCalculation`. Until then there is
 no currency default, pricing formula, zero-price fallback, or saved quote. The
 pending quote status is an orchestration state, not a SQL quote status. Pricing
 errors propagate to the caller for a future API adapter to translate.
+
+The separate async `QuoteService.calculate_quote` now loads service pricing via
+repositories for `POST /api/v1/quotes/calculate`. The existing synchronous draft
+interface above is unchanged. See [pricing rules and setup](../../../../docs/pricing.md).
 
 Blank strings and null counts indicate unknown requirements; zero is preserved
 when explicitly supplied. Counts reject negative numbers, booleans, and numeric

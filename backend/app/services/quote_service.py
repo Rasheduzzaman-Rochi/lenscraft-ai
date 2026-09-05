@@ -1,12 +1,17 @@
-"""Quote preparation with an injectable pricing interface and no default prices."""
+"""Database-backed quote calculation and backwards-compatible draft preparation."""
 
 from decimal import Decimal
 from typing import Literal, Protocol
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from app.services.conversation_service import CustomerRequirements
+from app.schemas.quote import PricingRule, QuoteCalculateRequest, QuoteCalculation
+from app.repositories.service_repository import ServiceRepository
+from app.repositories.pricing_repository import PricingRepository
+from app.repositories.errors import RecordNotFoundError
+from app.services.pricing_engine import PricingConfigurationError, calculate_price
 
 
 class QuoteRequest(BaseModel):
@@ -74,3 +79,26 @@ class QuoteService:
         if not isinstance(calculation, PriceCalculation):
             raise TypeError("Pricing calculator must return PriceCalculation")
         return QuoteResult(request=request, status="calculated", calculation=calculation)
+
+    async def calculate_quote(self, request: 'QuoteCalculateRequest') -> 'QuoteCalculation':
+        """Load this company's catalog and rules, then prepare an unsaved calculation."""
+
+        service = await ServiceRepository(request.company_id).get_service_by_name(request.service_name)
+        if service is None or service.get('is_active') is not True:
+            raise RecordNotFoundError('Active service not found in this company')
+        try:
+            service_id = UUID(str(service['id']))
+            if UUID(str(service['company_id'])) != request.company_id:
+                raise ValueError('Service company mismatch')
+            name = service['name']
+            pricing_type = service['pricing_type']
+        except (KeyError, TypeError, ValueError):
+            raise PricingConfigurationError('Invalid service configuration') from None
+        records = await PricingRepository(request.company_id).get_pricing_configuration(service_id)
+        try:
+            rules = [PricingRule.model_validate(record) for record in records]
+            if any(rule.service_id != service_id for rule in rules):
+                raise ValueError('Rule service mismatch')
+        except (ValidationError, ValueError):
+            raise PricingConfigurationError('Invalid stored pricing rules') from None
+        return calculate_price(request, service_name=name, pricing_type=pricing_type, rules=rules)
