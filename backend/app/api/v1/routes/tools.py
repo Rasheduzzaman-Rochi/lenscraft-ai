@@ -28,6 +28,7 @@ from app.services.pricing_engine import PricingConfigurationError, UnknownAddonE
 from app.services.tool_service import ToolDataError, ToolService
 
 router = APIRouter(prefix="/tools", tags=["retell-tools"])
+development_router = APIRouter(prefix="/tools", tags=["development-tools"])
 logger = logging.getLogger(__name__)
 MAX_TOOL_BODY_BYTES = 256_000
 
@@ -71,6 +72,21 @@ async def get_authenticated_tool_service(request: Request) -> ToolService:
 
 
 ToolDependency = Annotated[ToolService, Depends(get_authenticated_tool_service)]
+
+
+def get_development_tool_service(request: Request) -> ToolService:
+    """Bind the local test route to configured resources without Retell authentication."""
+    settings = request.app.state.settings
+    if (
+        settings.agent_company_id is None
+        or settings.supabase_url is None
+        or not settings.supabase_key.get_secret_value().strip()
+    ):
+        raise HTTPException(503, "Set Supabase credentials and AGENT_COMPANY_ID before testing tools.")
+    return ToolService(settings.agent_company_id)
+
+
+DevelopmentToolDependency = Annotated[ToolService, Depends(get_development_tool_service)]
 
 
 def no_store(response: Response) -> None:
@@ -145,12 +161,10 @@ async def create_lead(
         raise HTTPException(503, "Lead creation is temporarily unavailable.") from None
 
 
-@router.post("/search-knowledge", response_model=SearchKnowledgeResponse)
-async def search_knowledge(
-    payload: SearchKnowledgeRequest, response: Response, service: ToolDependency,
+async def execute_knowledge_search(
+    payload: SearchKnowledgeRequest, service: ToolService,
 ) -> SearchKnowledgeResponse:
-    """Return bounded tenant knowledge context for the current conversation."""
-    no_store(response)
+    """Run the shared knowledge tool and map domain failures to safe API errors."""
     try:
         result = await service.search_knowledge(payload)
     except PermissionError:
@@ -167,3 +181,23 @@ async def search_knowledge(
         raise HTTPException(503, "Knowledge search is temporarily unavailable.") from None
     logger.info("Retell knowledge search completed company_id=%s sources=%s", service.company_id, len(result.sources))
     return result
+
+
+@router.post("/search-knowledge", response_model=SearchKnowledgeResponse)
+async def search_knowledge(
+    payload: SearchKnowledgeRequest, response: Response, service: ToolDependency,
+) -> SearchKnowledgeResponse:
+    """Return bounded tenant knowledge context for a signed Retell request."""
+    no_store(response)
+    return await execute_knowledge_search(payload, service)
+
+
+@development_router.post("/search-knowledge-test", response_model=SearchKnowledgeResponse)
+async def search_knowledge_test(
+    payload: SearchKnowledgeRequest,
+    response: Response,
+    service: DevelopmentToolDependency,
+) -> SearchKnowledgeResponse:
+    """Exercise the production knowledge service without a Retell signature."""
+    no_store(response)
+    return await execute_knowledge_search(payload, service)
