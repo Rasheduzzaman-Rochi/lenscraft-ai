@@ -5,6 +5,7 @@ import hmac
 import json
 import time
 import unittest
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
@@ -24,9 +25,16 @@ from app.schemas.tools import (
 )
 from app.services.tool_service import ToolService
 from app.repositories.lead_repository import LeadRepository
+from app.repositories.booking_repository import BookingRepository
 from app.repositories.service_repository import ServiceRepository
 from app.schemas.quote import QuoteCalculation
-from app.schemas.tools import CalculateQuoteRequest, CreateLeadRequest, SearchServiceRequest
+from app.schemas.tools import (
+    CalculateQuoteRequest,
+    CreateBookingRequest,
+    CreateBookingResponse,
+    CreateLeadRequest,
+    SearchServiceRequest,
+)
 
 
 def sign(body: bytes, key: str) -> str:
@@ -101,6 +109,82 @@ class RetellToolApiTests(unittest.TestCase):
         self.assertFalse(response.json()["replayed"])
         self.assertEqual(response.json()["customer_id"], str(expected.customer_id))
 
+    def test_create_booking_persists_nested_customer_and_all_booking_fields(self):
+        customer_id, booking_id = uuid4(), uuid4()
+        requests: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            return httpx.Response(200, json=[{
+                "customer_id": str(customer_id),
+                "booking_id": str(booking_id),
+                "status": "pending",
+            }])
+
+        with httpx.Client(transport=httpx.MockTransport(handler)) as transport:
+            client = create_client(
+                "https://project.example.com",
+                "fake",
+                options=ClientOptions(
+                    httpx_client=transport,
+                    auto_refresh_token=False,
+                    persist_session=False,
+                ),
+            )
+            with patch("app.repositories.base.get_supabase_client", return_value=client):
+                response = self.send("/api/v1/tools/create-booking", {
+                    "company_id": str(self.company),
+                    "customer": {
+                        "name": "Jane Doe",
+                        "email": "JANE@example.com",
+                        "phone": "+15555550123",
+                        "business_name": "Jane Studio",
+                        "industry": "Retail",
+                    },
+                    "date_time": "2099-06-01T14:30:00Z",
+                    "service_type": "Product photography",
+                    "notes": "Bring the summer collection.",
+                })
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json(), {
+            "success": True,
+            "customer_id": str(customer_id),
+            "booking_id": str(booking_id),
+            "status": "pending",
+            "message": "Booking created successfully",
+        })
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        self.assertEqual(requests[0].url.path, "/rest/v1/rpc/create_booking_tool_workflow")
+        body = json.loads(requests[0].content)
+        self.assertEqual(body["p_company_id"], str(self.company))
+        self.assertEqual(body["p_customer"]["email"], "jane@example.com")
+        self.assertEqual(body["p_customer"]["industry"], "Retail")
+        self.assertEqual(body["p_service_type"], "Product photography")
+        self.assertEqual(body["p_notes"], "Bring the summer collection.")
+
+    def test_create_booking_validates_nested_payload_before_database_access(self):
+        base = {
+            "company_id": str(self.company),
+            "customer": {"name": "Jane Doe"},
+            "date_time": "2099-06-01T14:30:00Z",
+            "service_type": "Product photography",
+            "notes": "",
+        }
+        invalid = [
+            {**base, "service_type": " "},
+            {**base, "date_time": "2020-01-01T00:00:00Z"},
+            {**base, "date_time": "2099-06-01T14:30:00"},
+            {**base, "customer": {"name": " "}},
+            {**base, "customer_name": "old-flat-contract"},
+        ]
+        with patch("app.repositories.base.get_supabase_client") as client_factory:
+            for payload in invalid:
+                with self.subTest(payload=payload):
+                    response = self.send("/api/v1/tools/create-booking", payload)
+                    self.assertEqual(response.status_code, 422)
+        client_factory.assert_not_called()
+
     def test_knowledge_tool_returns_bounded_context_and_source_metadata(self):
         expected = SearchKnowledgeResponse(
             context="[Knowledge source: Delivery]\nFive business days.",
@@ -113,6 +197,63 @@ class RetellToolApiTests(unittest.TestCase):
             })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["sources"][0]["title"], "Delivery")
+
+    def test_unsigned_knowledge_test_route_is_development_only(self):
+        expected = SearchKnowledgeResponse(
+            context="[Knowledge source: Delivery]\nFive business days.",
+            sources=[KnowledgeSource(id=uuid4(), title="Delivery", relevance=0.5)],
+            retrieval_mode="full_text",
+        )
+        payload = {"company_id": str(self.company), "question": "When is delivery?"}
+
+        for environment in ("development", "testing"):
+            with self.subTest(environment=environment):
+                settings = Settings(
+                    _env_file=None,
+                    environment=environment,
+                    agent_company_id=self.company,
+                    supabase_url="https://project.example.com",
+                    supabase_key="server-test-key",
+                )
+                with patch.object(ToolService, "search_knowledge", AsyncMock(return_value=expected)) as method:
+                    with TestClient(create_app(settings)) as client:
+                        response = client.post(
+                            "/api/v1/tools/search-knowledge-test",
+                            json=payload,
+                        )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json(), expected.model_dump(mode="json"))
+                self.assertEqual(response.headers["cache-control"], "no-store")
+                method.assert_awaited_once()
+
+        for environment in ("staging", "production"):
+            with self.subTest(environment=environment):
+                settings = Settings(_env_file=None, environment=environment)
+                with TestClient(create_app(settings)) as client:
+                    response = client.post(
+                        "/api/v1/tools/search-knowledge-test",
+                        json=payload,
+                    )
+                    paths = client.get("/openapi.json").json()["paths"]
+                self.assertEqual(response.status_code, 404)
+                self.assertNotIn("/api/v1/tools/search-knowledge-test", paths)
+
+    def test_unsigned_knowledge_test_route_requires_database_configuration(self):
+        settings = Settings(_env_file=None, environment="testing")
+        with TestClient(create_app(settings)) as client:
+            response = client.post(
+                "/api/v1/tools/search-knowledge-test",
+                json={"company_id": str(self.company), "question": "Delivery?"},
+            )
+        self.assertEqual(response.status_code, 503)
+
+    def test_production_knowledge_route_still_requires_retell_signature(self):
+        with TestClient(create_app(self.settings)) as client:
+            response = client.post(
+                "/api/v1/tools/search-knowledge",
+                json={"company_id": str(self.company), "question": "Delivery?"},
+            )
+        self.assertEqual(response.status_code, 401)
 
     def test_invalid_signature_and_wrong_company_are_rejected(self):
         response = self.send("/api/v1/tools/search-service", {
@@ -158,6 +299,69 @@ class ToolServiceTests(unittest.IsolatedAsyncioTestCase):
         ))
         self.assertIsInstance(result, CalculateQuoteResponse)
         self.assertEqual(float(result.total_price), 12)
+
+    async def test_booking_service_uses_schema_and_repository_result(self):
+        company = uuid4()
+        customer_id, booking_id = uuid4(), uuid4()
+        services = Mock(spec=ServiceRepository)
+        services.company_id = str(company)
+        leads = Mock(spec=LeadRepository)
+        leads.company_id = str(company)
+        bookings = Mock(spec=BookingRepository)
+        bookings.company_id = str(company)
+        bookings.create_booking = AsyncMock(return_value={
+            "customer_id": str(customer_id),
+            "booking_id": str(booking_id),
+            "status": "pending",
+        })
+        knowledge = Mock()
+        knowledge.company_id = company
+        service = ToolService(
+            company,
+            services=services,
+            leads=leads,
+            bookings=bookings,
+            quotes=Mock(),
+            knowledge=knowledge,
+        )
+        request = CreateBookingRequest(
+            company_id=company,
+            customer={"name": "Jane"},
+            date_time=datetime.now(UTC) + timedelta(days=1),
+            service_type="Portrait session",
+            notes="Outdoor session",
+        )
+
+        result = await service.create_booking(request)
+
+        self.assertIsInstance(result, CreateBookingResponse)
+        self.assertEqual(result.customer_id, customer_id)
+        self.assertEqual(result.booking_id, booking_id)
+        bookings.create_booking.assert_awaited_once_with(request)
+
+    async def test_booking_tenant_is_checked_before_repository_access(self):
+        company = uuid4()
+        services = Mock(spec=ServiceRepository)
+        services.company_id = str(company)
+        leads = Mock(spec=LeadRepository)
+        leads.company_id = str(company)
+        bookings = Mock(spec=BookingRepository)
+        bookings.company_id = str(company)
+        bookings.create_booking = AsyncMock()
+        knowledge = Mock()
+        knowledge.company_id = company
+        service = ToolService(
+            company, services=services, leads=leads, bookings=bookings,
+            quotes=Mock(), knowledge=knowledge,
+        )
+        with self.assertRaises(PermissionError):
+            await service.create_booking(CreateBookingRequest(
+                company_id=uuid4(),
+                customer={"name": "Jane"},
+                date_time=datetime.now(UTC) + timedelta(days=1),
+                service_type="Portrait session",
+            ))
+        bookings.create_booking.assert_not_awaited()
 
     async def test_create_lead_delegates_one_hashed_idempotent_command(self):
         company = uuid4()

@@ -1,9 +1,10 @@
 """Validated contracts exposed to Retell custom functions."""
 
+from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.base import Count, Money, WriteData
 from app.schemas.customer import CustomerCreate
@@ -94,3 +95,34 @@ class SearchKnowledgeResponse(BaseModel):
     context: str = Field(max_length=6_000)
     sources: list[KnowledgeSource]
     retrieval_mode: Literal["semantic", "full_text"]
+
+
+class CreateBookingRequest(ToolRequest):
+    """Validated customer and appointment data for one booking command."""
+
+    company_id: UUID
+    customer: CustomerCreate
+    date_time: AwareDatetime
+    service_type: str = Field(min_length=1, max_length=500)
+    notes: str | None = Field(default=None, max_length=5_000)
+
+    @field_validator("date_time")
+    @classmethod
+    def booking_must_be_in_future(cls, value: datetime) -> datetime:
+        """Reject appointments that have already passed."""
+        if value <= datetime.now(UTC):
+            raise ValueError("date_time must be in the future")
+        return value
+
+    @field_validator("notes")
+    @classmethod
+    def empty_notes_are_absent(cls, value: str | None) -> str | None:
+        return value or None
+
+
+class CreateBookingResponse(BaseModel):
+    success: bool = True
+    customer_id: UUID
+    booking_id: UUID
+    status: Literal["pending"] = "pending"
+    message: str = "Booking created successfully"
