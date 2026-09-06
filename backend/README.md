@@ -11,6 +11,10 @@ operations for customers, leads, calls, projects, and quotes. The transcript lea
 processing endpoint connects the API to these repositories through a workflow service.
 The [pricing endpoint](../docs/pricing.md) calculates quotes from the company's
 service catalog and stored pricing rules, without saving quote records.
+The [knowledge and RAG foundation](../docs/rag.md) stores tenant documents and
+supports full-text or pgvector retrieval without selecting an embedding provider.
+The [Retell webhook foundation](../docs/retell-webhook.md) authenticates and
+normalizes voice-call events before handing final transcripts to agent services.
 
 ## Install and run locally
 
@@ -71,6 +75,7 @@ Settings are cached per process; restart after configuration changes.
 | `SUPABASE_TIMEOUT_SECONDS` | `10` | HTTP timeout per operation, greater than 0 and at most 60 seconds |
 | `AGENT_COMPANY_ID` | Empty | Existing company UUID for development/testing transcript processing |
 | `RETELL_API_KEY` | Empty | Reserved Retell credential |
+| `RETELL_WEBHOOK_TOLERANCE_SECONDS` | `300` | Maximum accepted webhook signature age, 30–900 seconds |
 | `OPENAI_API_KEY` | Empty | Reserved OpenAI credential |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL` |
 | `CORS_ORIGINS` | `[]` | JSON array of allowed browser origins |
@@ -194,15 +199,21 @@ python -m unittest discover -s tests -v
 | `app/api/v1/routes/database.py` | Development-only database count diagnostic and sanitized failures |
 | `app/api/v1/routes/agent.py` | Transcript processing endpoint and workflow error mapping |
 | `app/api/v1/routes/quotes.py` | Validated quote calculation endpoint |
+| `app/api/v1/routes/knowledge.py` | Development knowledge ingestion and search endpoints |
+| `app/api/v1/routes/retell.py` | Raw-body authenticated Retell webhook endpoint |
 | `app/services/__init__.py` | Marks the independent business service package |
 | `app/services/agent_service.py` | Coordinates explicitly requested service actions |
 | `app/services/conversation_service.py` | Normalizes supplied customer requirements |
 | `app/services/lead_service.py` | Prepares unsaved leads and validated partial updates |
 | `app/services/quote_service.py` | Prepares quotes with an injectable pricing interface |
 | `app/services/pricing_engine.py` | Pure fixed/per-image and add-on calculations |
+| `app/services/knowledge_service.py` | Knowledge storage, retrieval, and bounded context orchestration |
+| `app/services/embedding_service.py` | Provider-neutral async embedding interface and validation |
+| `app/services/retell_service.py` | Retell event normalization and agent-service handoff |
 | `app/services/lead_processing_service.py` | Coordinates customer, lead, project, and call persistence |
 | `app/services/README.md` | Service usage, contracts, and future integration flow |
 | `app/repositories/` | Async persistence adapters, validated inputs, and storage errors |
+| `app/repositories/knowledge_repository.py` | Tenant-scoped knowledge table and search RPC operations |
 | `app/repositories/README.md` | Repository interfaces, tenant contracts, and usage |
 | `app/database/__init__.py` | Marks the database connectivity package |
 | `app/database/supabase.py` | Reusable Supabase client, HTTP timeout, and connection cleanup |
@@ -222,4 +233,6 @@ python -m unittest discover -s tests -v
 | `tests/test_repositories.py` | Verifies real SDK request shapes, tenant filters, validation, and errors with mock HTTP |
 | `tests/test_lead_processing.py` | Exercises the full HTTP workflow, linking, failures, validation, and environment guards |
 | `tests/test_pricing.py` | Tests stored-rule calculations, configuration failures, and tenant filters |
+| `tests/test_knowledge.py` | Tests ingestion, semantic/full-text retrieval, provider contracts, and isolation |
+| `tests/test_retell.py` | Tests webhook signatures, replay protection, normalization, and privacy |
 | `README.md` | Installation, configuration, execution, and file reference |

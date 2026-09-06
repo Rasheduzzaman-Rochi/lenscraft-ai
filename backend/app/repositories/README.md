@@ -21,6 +21,7 @@ client from `app.database.supabase.get_supabase_client()` on first operation.
 | `QuoteRepository` | `create_quote(project_id, data)`, `update_quote_status(project_id, quote_id, status)`, `get_quotes_by_project(project_id, limit=50, offset=0)` |
 | `ServiceRepository` | `get_service_by_name(name)`, `get_active_services(limit=50, offset=0)` |
 | `PricingRepository` | `get_pricing_rules(service_id)`, `get_pricing_configuration(service_id)` |
+| `KnowledgeRepository` | `insert_document(data)`, `search_documents(...)`, `retrieve_by_company(...)` |
 
 Write methods accept their corresponding Pydantic models from `schemas.py` or
 mappings. Unknown fields are rejected, including caller-supplied company IDs.

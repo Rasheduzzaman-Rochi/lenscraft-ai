@@ -14,6 +14,9 @@ installation for validation and Python Decimal for monetary values.
 | `quote_service.py` | Prepare quote requests and delegate to the `PricingCalculator` protocol when supplied. |
 | `pricing_engine.py` | Calculate fixed/per-image subtotals and named add-ons from validated database rules. |
 | `lead_processing_service.py` | Extract labeled transcript facts, validate all write inputs, and call the four repositories in order. |
+| `knowledge_service.py` | Coordinate tenant knowledge storage, retrieval, and context preparation. |
+| `embedding_service.py` | Define and validate an abstract asynchronous embedding provider. |
+| `retell_service.py` | Normalize authenticated Retell events and invoke existing agent extraction. |
 
 ## Example
 

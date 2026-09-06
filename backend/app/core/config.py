@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     agent_company_id: UUID | None = None
     # Reserved for future integrations.
     retell_api_key: SecretStr = SecretStr("")
+    retell_webhook_tolerance_seconds: int = Field(default=300, ge=30, le=900)
     openai_api_key: SecretStr = SecretStr("")
 
     @field_validator("agent_company_id", mode="before")
