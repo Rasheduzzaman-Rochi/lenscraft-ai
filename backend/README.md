@@ -2,8 +2,8 @@
 
 FastAPI foundation for Python 3.12+, with a versioned liveness endpoint,
 environment configuration, CORS, JSON logging, Docker support, and a reusable
-Supabase client. SQL migrations live in `database/migrations/`. Authentication,
-ORM models are not implemented. The initial agent
+Supabase client. SQL migrations live in `database/migrations/`. End-user
+authentication and ORM models are not implemented. The initial agent
 service layer prepares requirements, lead drafts, and quote requests without
 external calls; see [service interfaces and examples](app/services/README.md).
 The [repository layer](app/repositories/README.md) provides tenant-scoped Supabase
@@ -15,6 +15,8 @@ The [knowledge and RAG foundation](../docs/rag.md) stores tenant documents and
 supports full-text or pgvector retrieval without selecting an embedding provider.
 The [Retell webhook foundation](../docs/retell-webhook.md) authenticates and
 normalizes voice-call events before handing final transcripts to agent services.
+The [Retell custom tools](../docs/retell-tools.md) expose authenticated service
+search, quote, lead, and knowledge operations for live conversations.
 
 ## Install and run locally
 
@@ -74,7 +76,7 @@ Settings are cached per process; restart after configuration changes.
 | `SUPABASE_KEY` | Empty | Server-only Supabase secret or legacy service_role key |
 | `SUPABASE_TIMEOUT_SECONDS` | `10` | HTTP timeout per operation, greater than 0 and at most 60 seconds |
 | `AGENT_COMPANY_ID` | Empty | Existing company UUID for development/testing transcript processing |
-| `RETELL_API_KEY` | Empty | Reserved Retell credential |
+| `RETELL_API_KEY` | Empty | Server-only key for Retell request signature verification |
 | `RETELL_WEBHOOK_TOLERANCE_SECONDS` | `300` | Maximum accepted webhook signature age, 30–900 seconds |
 | `OPENAI_API_KEY` | Empty | Reserved OpenAI credential |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL` |
@@ -193,7 +195,7 @@ python -m unittest discover -s tests -v
 | `app/main.py` | App factory, lifespan logging, CORS, and versioned router mounting |
 | `app/core/config.py` | Validated settings and cached environment loading |
 | `app/core/logging.py` | JSON formatter and stdout logging configuration |
-| `app/core/security.py` | Placeholder for future security utilities |
+| `app/core/security.py` | Timestamped Retell raw-body signature verification |
 | `app/api/v1/router.py` | Aggregates version-one endpoint routers |
 | `app/api/v1/routes/health.py` | Implements the liveness endpoint |
 | `app/api/v1/routes/database.py` | Development-only database count diagnostic and sanitized failures |
@@ -201,6 +203,7 @@ python -m unittest discover -s tests -v
 | `app/api/v1/routes/quotes.py` | Validated quote calculation endpoint |
 | `app/api/v1/routes/knowledge.py` | Development knowledge ingestion and search endpoints |
 | `app/api/v1/routes/retell.py` | Raw-body authenticated Retell webhook endpoint |
+| `app/api/v1/routes/tools.py` | Signed Retell custom-function endpoints and sanitized HTTP errors |
 | `app/services/__init__.py` | Marks the independent business service package |
 | `app/services/agent_service.py` | Coordinates explicitly requested service actions |
 | `app/services/conversation_service.py` | Normalizes supplied customer requirements |
@@ -210,6 +213,7 @@ python -m unittest discover -s tests -v
 | `app/services/knowledge_service.py` | Knowledge storage, retrieval, and bounded context orchestration |
 | `app/services/embedding_service.py` | Provider-neutral async embedding interface and validation |
 | `app/services/retell_service.py` | Retell event normalization and agent-service handoff |
+| `app/services/tool_service.py` | Tenant-bound orchestration for Retell tool operations |
 | `app/services/lead_processing_service.py` | Coordinates customer, lead, project, and call persistence |
 | `app/services/README.md` | Service usage, contracts, and future integration flow |
 | `app/repositories/` | Async persistence adapters, validated inputs, and storage errors |
@@ -217,7 +221,8 @@ python -m unittest discover -s tests -v
 | `app/repositories/README.md` | Repository interfaces, tenant contracts, and usage |
 | `app/database/__init__.py` | Marks the database connectivity package |
 | `app/database/supabase.py` | Reusable Supabase client, HTTP timeout, and connection cleanup |
-| `database/migrations/*.sql` | Tenant schema, indexes, triggers, and read policies |
+| `app/schemas/tools.py` | Strict Retell tool request and bounded response contracts |
+| `database/migrations/*.sql` | Tenant schema, indexes, search functions, idempotency, triggers, and policies |
 | `app/models/__init__.py` | Reserves the model package without defining models |
 | `app/schemas/` | Shared Pydantic conversation, customer, lead, project, and call contracts |
 | `app/utils/__init__.py` | Reserves the shared utilities package |

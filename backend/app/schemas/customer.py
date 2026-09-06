@@ -7,11 +7,11 @@ from app.schemas.base import WriteData
 class CustomerCreate(WriteData):
     """Customer columns accepted for insertion."""
 
-    name: str = Field(min_length=1)
-    email: str | None = None
-    phone: str | None = None
-    business_name: str | None = None
-    industry: str | None = None
+    name: str = Field(min_length=1, max_length=500)
+    email: str | None = Field(default=None, max_length=320)
+    phone: str | None = Field(default=None, max_length=50)
+    business_name: str | None = Field(default=None, max_length=500)
+    industry: str | None = Field(default=None, max_length=200)
 
     @field_validator('email')
     @classmethod
@@ -23,7 +23,7 @@ class CustomerCreate(WriteData):
 class CustomerUpdate(CustomerCreate):
     """Partial customer changes; omitted fields are preserved, nulls clear contacts."""
 
-    name: str | None = Field(default=None, min_length=1)
+    name: str | None = Field(default=None, min_length=1, max_length=500)
 
     @model_validator(mode='after')
     def name_cannot_be_cleared(self) -> 'CustomerUpdate':

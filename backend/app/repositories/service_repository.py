@@ -23,3 +23,15 @@ class ServiceRepository(BaseRepository):
             client.table('services').select('*').eq('company_id', self.company_id)
             .eq('is_active', True).order('name').order('id').range(start, end).execute(),
         ))
+
+    async def search_active_services(self, query: str, *, limit: int = 5) -> list[Record]:
+        """Search this company's active catalog through the indexed database function."""
+        query = query.strip()
+        if not query:
+            raise ValueError('Service search query must not be empty')
+        if type(limit) is not int or not 1 <= limit <= 10:
+            raise ValueError('limit must be an integer between 1 and 10')
+        parameters = {'p_company_id': self.company_id, 'p_query': query, 'p_limit': limit}
+        return await self._run(lambda client: self._rows(
+            client.rpc('search_active_services', parameters).execute(),
+        ))

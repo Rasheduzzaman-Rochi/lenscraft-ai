@@ -1,4 +1,4 @@
-"""Webhook authentication utilities; end-user authentication is not implemented."""
+"""Retell request authentication utilities; end-user authentication is not implemented."""
 
 import hashlib
 import hmac
@@ -8,7 +8,7 @@ import time
 _RETELL_SIGNATURE_PATTERN = re.compile(r"^v=(\d+),d=([0-9a-fA-F]{64})$")
 
 
-def verify_retell_webhook_signature(
+def verify_retell_request_signature(
     raw_body: bytes,
     signature: str | None,
     api_key: str,
@@ -36,3 +36,21 @@ def verify_retell_webhook_signature(
         api_key.encode("utf-8"), signed_payload, hashlib.sha256,
     ).hexdigest()
     return hmac.compare_digest(expected_digest, supplied_digest.lower())
+
+
+def verify_retell_webhook_signature(
+    raw_body: bytes,
+    signature: str | None,
+    api_key: str,
+    *,
+    tolerance_seconds: int = 300,
+    current_time_seconds: float | None = None,
+) -> bool:
+    """Compatibility name retained for the existing webhook integration."""
+    return verify_retell_request_signature(
+        raw_body,
+        signature,
+        api_key,
+        tolerance_seconds=tolerance_seconds,
+        current_time_seconds=current_time_seconds,
+    )

@@ -37,3 +37,25 @@ class LeadRepository(BaseRepository):
             client.table('leads').select('*').eq('company_id', self.company_id)
             .eq('id', lead_id).limit(1).execute(),
         ))
+
+    async def create_tool_workflow(
+        self, *, request_id: str, request_hash: str,
+        customer: Mapping[str, Any], lead: Mapping[str, Any], project: Mapping[str, Any],
+    ) -> Record:
+        """Create customer, lead, and project in one idempotent database transaction."""
+        request_id = request_id.strip()
+        if not request_id or len(request_id) > 200:
+            raise ValueError('request_id must contain 1 to 200 characters')
+        if len(request_hash) != 64 or any(character not in '0123456789abcdef' for character in request_hash):
+            raise ValueError('request_hash must be a lowercase SHA-256 digest')
+        parameters = {
+            'p_company_id': self.company_id,
+            'p_request_id': request_id,
+            'p_request_hash': request_hash,
+            'p_customer': dict(customer),
+            'p_lead': dict(lead),
+            'p_project': dict(project),
+        }
+        return await self._run(lambda client: self._one(
+            client.rpc('create_lead_tool_workflow', parameters).execute(), required=True,
+        ))

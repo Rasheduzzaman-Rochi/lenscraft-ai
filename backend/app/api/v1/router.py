@@ -8,10 +8,12 @@ from app.api.v1.routes.agent import router as agent_router
 from app.api.v1.routes.quotes import router as quotes_router
 from app.api.v1.routes.knowledge import router as knowledge_router
 from app.api.v1.routes.retell import router as retell_router
+from app.api.v1.routes.tools import router as tools_router
 
 router = APIRouter()
 router.include_router(health_router)
 router.include_router(retell_router)
+router.include_router(tools_router)
 
 
 def create_api_router(*, include_development_routes: bool = False) -> APIRouter:
