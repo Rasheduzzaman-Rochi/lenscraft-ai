@@ -42,19 +42,20 @@ Copy `backend/.env.example` to `backend/.env` for backend configuration.
 Never commit populated environment files. Configure production secrets through
 the deployment environment.
 
-The root `.env.example` is a future platform configuration reference and is not
-loaded by the backend. Only explicitly public values may use `NEXT_PUBLIC_`.
+The root `.env.example` documents Docker Compose interpolation values. The
+backend does not read the root `.env` directly; Compose injects the mapped
+values. Only explicitly public values may use `NEXT_PUBLIC_`.
 
 ## Project status
 
 The backend foundation includes `/api/v1/health`, environment settings, CORS,
-JSON logging, Supabase connectivity, tests, and a Dockerfile. Frontend and shared documentation remain
-skeletons. `docker-compose.yml` is an empty Compose placeholder; use the backend
-README for standalone Docker commands and `/api/v1/test/database` setup.
+JSON logging, Supabase connectivity, tests, and a production Docker image. The
+root `docker-compose.yml` defines the backend service for Dokploy; see the
+[deployment guide](docs/deployment.md) for local and production instructions.
+The frontend remains a skeleton.
 SQL migrations are available in `backend/database/migrations/`; applying them
 to Supabase is a separate step. The database diagnostic is available only in
 development and testing.
 
-Further production work includes authentication, database access controls,
-migrations, integration tests, monitoring, backup procedures, and platform-level
-Dokploy configuration.
+Further production work includes end-user authentication, integration tests,
+monitoring, and backup procedures.

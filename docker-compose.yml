@@ -1,6 +1,47 @@
 name: lenscraft-ai
 
-# Structural placeholder only. Add frontend and backend services with their
-# Dockerfiles, environment mappings, and health checks during implementation.
-# PostgreSQL will be provided by Supabase.
-services: {}
+services:
+  backend:
+    image: lenscraft-backend:${IMAGE_TAG:-latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    environment:
+      APP_NAME: "${APP_NAME:-lenscraft-backend}"
+      ENVIRONMENT: "${ENVIRONMENT:-production}"
+      SUPABASE_URL: "${SUPABASE_URL:?SUPABASE_URL is required}"
+      SUPABASE_KEY: "${SUPABASE_KEY:?SUPABASE_KEY is required}"
+      SUPABASE_TIMEOUT_SECONDS: "${SUPABASE_TIMEOUT_SECONDS:-10}"
+      AGENT_COMPANY_ID: "${AGENT_COMPANY_ID:?AGENT_COMPANY_ID is required}"
+      RETELL_API_KEY: "${RETELL_API_KEY:?RETELL_API_KEY is required}"
+      RETELL_WEBHOOK_TOLERANCE_SECONDS: "${RETELL_WEBHOOK_TOLERANCE_SECONDS:-300}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      CORS_ORIGINS: "${CORS_ORIGINS:-[]}"
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3).close()"
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"

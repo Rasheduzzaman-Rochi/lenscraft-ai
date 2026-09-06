@@ -169,15 +169,15 @@ From the repository root, after creating `backend/.env`:
 docker build -t lenscraft-backend:local backend
 docker run --rm --name lenscraft-backend \
   --env-file backend/.env \
-  -p 8000:8000 lenscraft-backend:local
+  -p 127.0.0.1:8000:8000 lenscraft-backend:local
 ```
 
-The image runs Python 3.12 as an unprivileged user, starts one Uvicorn worker,
-and probes `/api/v1/health`. Local environment files, virtual environments, and
-tests are excluded from the build. Supply production variables through Dokploy
-and set `ENVIRONMENT=production`. Build `backend/Dockerfile` with `backend/` as
-its build context and route traffic to port 8000. The root Compose file remains
-a placeholder.
+The image runs Python 3.12 as an unprivileged user, starts one Uvicorn worker
+without reload mode, accepts Dokploy/Traefik proxy headers, and probes
+`/api/v1/health`. Local environment files, virtual environments, and tests are
+excluded from the build. The root Compose file defines the hardened backend
+service without publishing its port on the host. See the complete
+[Docker and Dokploy deployment guide](../docs/deployment.md).
 
 ## Verification
 

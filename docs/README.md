@@ -10,3 +10,5 @@ Home for shared project documentation, including:
 
 Add these documents as the corresponding components are designed and implemented.
 Never include credentials or customer data in documentation.
+
+Deployment instructions: [Docker and Dokploy](deployment.md).
