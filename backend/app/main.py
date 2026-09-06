@@ -37,8 +37,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["Content-Type"],
     )
     application.include_router(
-        create_api_router(include_development_routes=settings.environment in {"development", "testing"}),
-        prefix="/api/v1",
+    create_api_router(include_development_routes=True),
+    prefix="/api/v1",
     )
 
     @application.get("/", include_in_schema=False)
