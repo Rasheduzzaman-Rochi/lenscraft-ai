@@ -44,10 +44,10 @@ export function VisualPlaceholder({
         className,
       )}
     >
-      <div className="absolute -left-[12%] top-[12%] h-[58%] w-[58%] rounded-full border border-white/25 bg-white/10 blur-[1px] transition duration-700 group-hover:scale-105" />
-      <div className="absolute right-[8%] top-[18%] h-[48%] w-[34%] rotate-12 border border-white/25 bg-black/10 shadow-2xl transition duration-700 group-hover:rotate-6" />
+      <div className="absolute -left-[12%] top-[12%] h-[58%] w-[58%] rounded-full border border-white/25 bg-white/10 blur-[1px] transition duration-1000 ease-out group-hover:scale-110 group-hover:-translate-y-2" />
+      <div className="absolute right-[8%] top-[18%] h-[48%] w-[34%] rotate-12 border border-white/25 bg-black/10 shadow-2xl transition duration-1000 ease-out group-hover:rotate-3 group-hover:scale-105" />
       <div className="absolute bottom-[12%] left-[18%] h-[24%] w-[46%] -rotate-6 rounded-[50%] bg-black/20 blur-sm" />
-      <div className="absolute inset-0 bg-[linear-gradient(115deg,transparent_30%,rgba(255,255,255,0.18)_49%,transparent_68%)] opacity-60" />
+      <div className="absolute inset-0 translate-x-[-75%] bg-[linear-gradient(115deg,transparent_30%,rgba(255,255,255,0.18)_49%,transparent_68%)] opacity-60 transition-transform duration-[1400ms] ease-out group-hover:translate-x-[55%]" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-white/5" />
       {!minimal ? (
         <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-5 text-white sm:p-6">

@@ -1,13 +1,14 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ArrowUpRight } from "lucide-react";
 import { useState } from "react";
 
 import { VisualPlaceholder } from "@/components/visual-placeholder";
 import { portfolioItems } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
-const categories = ["All", ...Array.from(new Set(portfolioItems.map((item) => item.category)))];
+const categories = ["All", "Fashion", "Product", "Jewellery", "Lifestyle"];
 
 export function PortfolioGallery() {
   const [active, setActive] = useState("All");
@@ -16,7 +17,8 @@ export function PortfolioGallery() {
 
   return (
     <>
-      <div className="flex gap-2 overflow-x-auto border-b border-ink/15 pb-5" aria-label="Filter portfolio">
+      <div className="flex items-center justify-between gap-8 border-b border-ink/15 pb-5">
+        <div className="flex gap-2 overflow-x-auto" aria-label="Filter portfolio">
         {categories.map((category) => (
           <button
             key={category}
@@ -31,8 +33,10 @@ export function PortfolioGallery() {
             {category}
           </button>
         ))}
+        </div>
+        <p className="hidden shrink-0 text-[9px] uppercase tracking-[0.18em] text-ink/30 md:block">{visible.length.toString().padStart(2, "0")} studies</p>
       </div>
-      <motion.div layout className="mt-8 columns-1 gap-5 sm:columns-2 lg:columns-3">
+      <motion.div layout className="mt-8 columns-1 gap-4 sm:columns-2 lg:columns-3 lg:gap-6">
         <AnimatePresence mode="popLayout">
           {visible.map((item, index) => (
             <motion.div
@@ -42,9 +46,13 @@ export function PortfolioGallery() {
               animate={{ opacity: 1, scale: 1 }}
               exit={reduceMotion ? undefined : { opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.35, delay: Math.min(index * 0.035, 0.18) }}
-              className="mb-5 break-inside-avoid"
+              className="group relative mb-4 break-inside-avoid overflow-hidden bg-ink lg:mb-6"
             >
-              <VisualPlaceholder {...item} />
+              <VisualPlaceholder {...item} className="transition duration-700 ease-out group-hover:scale-[1.025] group-hover:brightness-90" />
+              <div className="pointer-events-none absolute inset-0 flex items-start justify-between p-5 opacity-0 transition duration-500 group-hover:opacity-100">
+                <span className="grid h-10 w-10 place-items-center rounded-full border border-white/30 bg-black/10 text-white backdrop-blur-md"><ArrowUpRight className="h-4 w-4" /></span>
+                <span className="text-[9px] uppercase tracking-[0.18em] text-white/70">Study {(index + 1).toString().padStart(2, "0")}</span>
+              </div>
             </motion.div>
           ))}
         </AnimatePresence>

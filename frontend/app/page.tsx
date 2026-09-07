@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowRight, Clock3, Mic, ScanLine, ShieldCheck, Sparkles } from "lucide-react";
+import { Aperture, ArrowDown, ArrowRight, Clock3, Mic, ScanLine, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 import { Reveal } from "@/components/reveal";
@@ -19,24 +19,26 @@ export default function HomePage() {
   return (
     <>
       <section className="relative min-h-screen overflow-hidden bg-bone pt-32 sm:pt-40">
-        <div className="page-shell grid min-h-[calc(100vh-10rem)] gap-12 pb-12 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_26%,rgba(154,117,78,0.16),transparent_28%),linear-gradient(to_right,rgba(23,22,18,0.035)_1px,transparent_1px)] bg-[size:auto,8vw_100%]" />
+        <p className="pointer-events-none absolute -right-4 top-28 hidden font-serif text-[15vw] leading-none tracking-[-0.08em] text-ink/[0.025] xl:block">LENS</p>
+        <div className="page-shell relative grid min-h-[calc(100vh-10rem)] gap-12 pb-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
           <div className="relative z-10 pb-8 lg:pb-16">
             <Reveal>
-              <p className="eyebrow">Commercial photography studio — Est. 2026</p>
-              <h1 className="mt-7 max-w-4xl font-serif text-[clamp(4.4rem,10.5vw,10rem)] leading-[0.78] tracking-[-0.055em] text-ink">
-                Images with <span className="italic text-bronze">intent.</span>
+              <div className="flex items-center gap-4"><Aperture className="h-4 w-4 text-bronze" strokeWidth={1.2} /><p className="eyebrow">Commercial photography studio — Est. 2026</p></div>
+              <h1 className="mt-8 max-w-4xl font-serif text-[clamp(4.4rem,10.5vw,10rem)] leading-[0.76] tracking-[-0.06em] text-ink">
+                Make them <span className="italic text-bronze">look twice.</span>
               </h1>
             </Reveal>
             <Reveal delay={0.12} className="mt-9 grid gap-7 sm:grid-cols-[1fr_auto] sm:items-end">
               <p className="max-w-md text-base leading-7 text-ink/60">
-                Elevated product and fashion photography for brands that care how they are seen, remembered, and chosen.
+                Art-directed product and fashion photography for ambitious brands that care how they are seen, remembered, and chosen.
               </p>
               <div className="flex flex-wrap gap-3">
-                <Button asChild><Link href="/booking">Book a shoot <ArrowRight className="h-4 w-4" /></Link></Button>
+                <Button asChild className="shadow-[0_16px_35px_rgba(23,22,18,0.15)]"><Link href="/booking">Start your project <ArrowRight className="h-4 w-4" /></Link></Button>
                 <VoiceAssistantTrigger variant="outline">Talk with LensCraft AI <Mic className="h-4 w-4" /></VoiceAssistantTrigger>
-                <Button asChild variant="outline"><Link href="/portfolio">View work</Link></Button>
               </div>
             </Reveal>
+            <Reveal delay={0.2} className="mt-8"><Link href="/portfolio" className="inline-flex items-center gap-2 border-b border-ink/25 pb-1 text-[9px] font-semibold uppercase tracking-[0.2em] transition hover:border-bronze hover:text-bronze">Explore selected work <ArrowRight className="h-3 w-3" /></Link></Reveal>
           </div>
 
           <Reveal delay={0.18} className="relative mx-auto w-full max-w-xl lg:mx-0 lg:max-w-none">
@@ -46,10 +48,29 @@ export default function HomePage() {
               <p className="mt-2 text-[8px] uppercase leading-4 tracking-[0.2em] text-ink/45">Light<br />Form<br />Feeling</p>
             </div>
           </Reveal>
+          <Reveal delay={0.25} className="relative z-10 grid grid-cols-3 border-y border-ink/15 py-5 lg:col-span-2">
+            <div><p className="font-serif text-2xl sm:text-3xl">06</p><p className="mt-1 text-[8px] uppercase tracking-[0.17em] text-ink/40">Specialist services</p></div>
+            <div className="border-l border-ink/15 pl-5 sm:pl-8"><p className="font-serif text-2xl sm:text-3xl">01–01</p><p className="mt-1 text-[8px] uppercase tracking-[0.17em] text-ink/40">Creative direction</p></div>
+            <div className="border-l border-ink/15 pl-5 sm:pl-8"><p className="font-serif text-2xl sm:text-3xl">24/7</p><p className="mt-1 text-[8px] uppercase tracking-[0.17em] text-ink/40">AI studio line</p></div>
+          </Reveal>
         </div>
         <a href="#services" aria-label="Scroll to services" className="absolute bottom-8 left-1/2 hidden -translate-x-1/2 text-ink/45 transition hover:text-ink lg:block">
           <ArrowDown className="h-5 w-5 animate-bounce" strokeWidth={1} />
         </a>
+      </section>
+
+      <section className="overflow-hidden bg-ink py-16 text-paper sm:py-24">
+        <div className="page-shell">
+          <Reveal className="flex items-end justify-between gap-8">
+            <div><p className="eyebrow text-paper/40">Current visual studies</p><h2 className="mt-4 max-w-2xl font-serif text-4xl leading-none sm:text-5xl">A point of view, before the shutter.</h2></div>
+            <p className="hidden max-w-xs text-right text-xs leading-5 text-paper/45 md:block">Light, material, colour, and movement composed into images with commercial purpose.</p>
+          </Reveal>
+          <div className="mt-12 grid grid-cols-12 items-end gap-3 sm:gap-5">
+            <Reveal className="col-span-7 sm:col-span-5"><VisualPlaceholder {...portfolioItems[7]} className="aspect-[4/5]" /></Reveal>
+            <Reveal delay={0.1} className="col-span-5 sm:col-span-3"><VisualPlaceholder {...portfolioItems[2]} className="aspect-[3/4]" /></Reveal>
+            <Reveal delay={0.18} className="col-span-8 col-start-3 mt-6 sm:col-span-4 sm:col-start-auto sm:mt-0"><VisualPlaceholder {...portfolioItems[10]} className="aspect-[5/4]" /></Reveal>
+          </div>
+        </div>
       </section>
 
       <section id="services" className="section-space bg-paper">
@@ -126,11 +147,11 @@ export default function HomePage() {
           <Reveal className="flex flex-col justify-center py-20 sm:py-28 lg:pr-16">
             <div className="flex h-12 w-12 items-center justify-center rounded-full border border-ink/25"><Sparkles className="h-5 w-5" strokeWidth={1.25} /></div>
             <p className="eyebrow mt-8">Always available</p>
-            <h2 className="mt-5 font-serif text-5xl leading-[0.95] sm:text-6xl">Meet your studio assistant.</h2>
+            <h2 className="mt-5 font-serif text-5xl leading-[0.92] sm:text-7xl">Your next project starts with a conversation.</h2>
             <p className="mt-6 max-w-lg text-base leading-7 text-ink/60">
               Explore services, discuss a project, request an estimate, or find a suitable time—our AI studio assistant is ready when you are.
             </p>
-            <div className="mt-8"><VoiceAssistantTrigger>Talk with LensCraft AI <Mic className="h-4 w-4" /></VoiceAssistantTrigger></div>
+            <div className="mt-9 flex flex-wrap items-center gap-4"><VoiceAssistantTrigger className="shadow-[0_16px_35px_rgba(23,22,18,0.14)]">Talk with LensCraft AI <Mic className="h-4 w-4" /></VoiceAssistantTrigger><span className="text-[9px] uppercase tracking-[0.16em] text-ink/40">No waiting · Speak naturally</span></div>
           </Reveal>
           <Reveal delay={0.12} className="relative min-h-[420px] lg:min-h-[620px]">
             <VisualPlaceholder title="The Studio Line" category="AI assisted" tone="bronze" className="absolute inset-0 aspect-auto h-full w-full" />

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, Mic } from "lucide-react";
 import Link from "next/link";
 
 import { PageHero } from "@/components/page-hero";
 import { Reveal } from "@/components/reveal";
 import { Button } from "@/components/ui/button";
 import { VisualPlaceholder } from "@/components/visual-placeholder";
+import { VoiceAssistantTrigger } from "@/components/voice-assistant";
 import { services } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
@@ -68,7 +69,10 @@ export default function ServicesPage() {
           </Reveal>
           <Reveal delay={0.1}>
             <p className="mb-7 max-w-md text-sm leading-6 text-paper/55">Tell us what the finished collection needs to do. We will shape the right production around it.</p>
-            <Button asChild variant="light"><Link href="/contact">Discuss your project <ArrowRight className="h-4 w-4" /></Link></Button>
+            <div className="flex flex-wrap gap-3">
+              <Button asChild variant="light"><Link href="/booking">Request a booking <ArrowRight className="h-4 w-4" /></Link></Button>
+              <VoiceAssistantTrigger className="border-paper/25 text-paper hover:border-paper hover:bg-paper hover:text-ink" variant="outline">Talk with LensCraft AI <Mic className="h-4 w-4" /></VoiceAssistantTrigger>
+            </div>
           </Reveal>
         </div>
       </section>

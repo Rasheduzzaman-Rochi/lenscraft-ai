@@ -76,12 +76,15 @@ export const portfolioItems: PortfolioItem[] = [
   { title: "Form No. 01", category: "Product", orientation: "portrait", tone: "ivory" },
   { title: "After Hours", category: "Fashion", orientation: "landscape", tone: "noir" },
   { title: "Fine Objects", category: "Jewellery", orientation: "square", tone: "bronze" },
-  { title: "Soft Geometry", category: "Flat Lay", orientation: "landscape", tone: "rose" },
-  { title: "The Essential Shirt", category: "Ghost Mannequin", orientation: "portrait", tone: "stone" },
+  { title: "Soft Geometry", category: "Product", orientation: "landscape", tone: "rose" },
+  { title: "The Essential Shirt", category: "Fashion", orientation: "portrait", tone: "stone" },
   { title: "Sunday Light", category: "Lifestyle", orientation: "square", tone: "moss" },
   { title: "Quiet Utility", category: "Product", orientation: "square", tone: "stone" },
   { title: "New Classic", category: "Fashion", orientation: "portrait", tone: "rose" },
   { title: "Brilliance Study", category: "Jewellery", orientation: "landscape", tone: "noir" },
+  { title: "Golden Hour", category: "Lifestyle", orientation: "portrait", tone: "bronze" },
+  { title: "Object & Shadow", category: "Product", orientation: "landscape", tone: "moss" },
+  { title: "Precious Light", category: "Jewellery", orientation: "portrait", tone: "ivory" },
 ];
 
 export const processSteps = [

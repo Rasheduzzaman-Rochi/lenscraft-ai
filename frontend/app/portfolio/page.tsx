@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import { ArrowRight } from "lucide-react";
+import Link from "next/link";
 
 import { PageHero } from "@/components/page-hero";
 import { PortfolioGallery } from "@/components/portfolio-gallery";
 import { Reveal } from "@/components/reveal";
+import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "Portfolio",
@@ -25,11 +28,12 @@ export default function PortfolioPage() {
         </div>
       </section>
       <section className="border-t border-ink/15 bg-bone py-16">
-        <div className="page-shell grid gap-6 md:grid-cols-3">
+        <div className="page-shell grid gap-6 md:grid-cols-3 md:items-end">
           <p className="eyebrow">A note on the work</p>
-          <p className="max-w-xl font-serif text-3xl leading-tight md:col-span-2 sm:text-4xl">
-            These art-directed placeholders establish the visual system. Final commissioned photography can replace each frame without changing the layout.
-          </p>
+          <div className="md:col-span-2">
+            <p className="max-w-3xl font-serif text-3xl leading-tight sm:text-4xl">Have a collection ready to become the next study?</p>
+            <div className="mt-7"><Button asChild><Link href="/booking">Start your project <ArrowRight className="h-4 w-4" /></Link></Button></div>
+          </div>
         </div>
       </section>
     </>

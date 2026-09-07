@@ -6,6 +6,7 @@ from app.api.v1.routes.health import router as health_router
 from app.api.v1.routes.database import router as database_router
 from app.api.v1.routes.agent import router as agent_router
 from app.api.v1.routes.bookings import router as bookings_router
+from app.api.v1.routes.admin import router as admin_router
 from app.api.v1.routes.quotes import router as quotes_router
 from app.api.v1.routes.knowledge import router as knowledge_router
 from app.api.v1.routes.retell import router as retell_router
@@ -17,6 +18,7 @@ router.include_router(health_router)
 router.include_router(retell_router)
 router.include_router(tools_router)
 router.include_router(bookings_router)
+router.include_router(admin_router)
 
 
 def create_api_router(*, include_development_routes: bool = False) -> APIRouter:
