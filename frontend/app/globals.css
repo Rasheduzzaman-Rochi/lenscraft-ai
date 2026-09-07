@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --paper: 250 248 243;
+  --ink: 23 22 18;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: rgb(var(--paper));
+}
+
+body {
+  margin: 0;
+  background: rgb(var(--paper));
+  color: rgb(var(--ink));
+  font-family: Arial, Helvetica, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: #9a754e;
+  color: #faf8f3;
+}
+
+@layer components {
+  .page-shell {
+    @apply mx-auto w-full max-w-[1440px] px-5 sm:px-8 lg:px-12 xl:px-16;
+  }
+
+  .section-space {
+    @apply py-20 sm:py-28 lg:py-36;
+  }
+
+  .eyebrow {
+    @apply text-[9px] font-semibold uppercase tracking-[0.24em] text-ink/45;
+  }
+
+  .nav-link {
+    @apply relative py-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-ink/65 transition hover:text-ink;
+  }
+
+  .nav-link::after {
+    content: "";
+    @apply absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-bronze transition-transform duration-300;
+  }
+
+  .nav-link:hover::after {
+    @apply scale-x-100;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
