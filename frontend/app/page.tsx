@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowRight, Clock3, MessagesSquare, ScanLine, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowRight, Clock3, Mic, ScanLine, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 import { Reveal } from "@/components/reveal";
@@ -6,6 +6,7 @@ import { SectionHeading } from "@/components/section-heading";
 import { ServiceCard } from "@/components/service-card";
 import { Button } from "@/components/ui/button";
 import { VisualPlaceholder } from "@/components/visual-placeholder";
+import { VoiceAssistantTrigger } from "@/components/voice-assistant";
 import { portfolioItems, processSteps, services } from "@/lib/data";
 
 const reasons = [
@@ -32,6 +33,7 @@ export default function HomePage() {
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button asChild><Link href="/booking">Book a shoot <ArrowRight className="h-4 w-4" /></Link></Button>
+                <VoiceAssistantTrigger variant="outline">Talk with LensCraft AI <Mic className="h-4 w-4" /></VoiceAssistantTrigger>
                 <Button asChild variant="outline"><Link href="/portfolio">View work</Link></Button>
               </div>
             </Reveal>
@@ -128,7 +130,7 @@ export default function HomePage() {
             <p className="mt-6 max-w-lg text-base leading-7 text-ink/60">
               Explore services, discuss a project, request an estimate, or find a suitable time—our AI studio assistant is ready when you are.
             </p>
-            <div className="mt-8"><Button asChild><Link href="/contact">Start a conversation <MessagesSquare className="h-4 w-4" /></Link></Button></div>
+            <div className="mt-8"><VoiceAssistantTrigger>Talk with LensCraft AI <Mic className="h-4 w-4" /></VoiceAssistantTrigger></div>
           </Reveal>
           <Reveal delay={0.12} className="relative min-h-[420px] lg:min-h-[620px]">
             <VisualPlaceholder title="The Studio Line" category="AI assisted" tone="bronze" className="absolute inset-0 aspect-auto h-full w-full" />

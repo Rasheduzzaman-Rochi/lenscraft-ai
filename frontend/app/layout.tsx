@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { VoiceAssistant } from "@/components/voice-assistant";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://lenscraft.studio"),
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <SiteHeader />
         <main id="main-content">{children}</main>
         <SiteFooter />
+        <VoiceAssistant />
       </body>
     </html>
   );
