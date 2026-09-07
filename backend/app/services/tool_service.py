@@ -3,6 +3,7 @@
 import hashlib
 import json
 import logging
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -16,10 +17,16 @@ from app.schemas.knowledge import KnowledgeSearchRequest
 from app.schemas.tools import (
     CalculateQuoteRequest,
     CalculateQuoteResponse,
+    CheckBookingAvailabilityRequest,
+    CheckBookingAvailabilityResponse,
+    CreateBookingConflictResponse,
     CreateBookingRequest,
     CreateBookingResponse,
+    CreateBookingResult,
     CreateLeadRequest,
     CreateLeadResponse,
+    GetBookingStatusRequest,
+    GetBookingStatusResponse,
     KnowledgeSource,
     SearchKnowledgeRequest,
     SearchKnowledgeResponse,
@@ -29,6 +36,7 @@ from app.schemas.tools import (
 )
 
 from app.services.knowledge_service import KnowledgeService
+from app.services.booking_service import BookingService
 from app.services.quote_service import QuoteService
 
 
@@ -58,6 +66,10 @@ class ToolService:
         self.services = services or ServiceRepository(self.company_id)
         self.leads = leads or LeadRepository(self.company_id)
         self.bookings = bookings or BookingRepository(self.company_id)
+        self.booking_workflow = BookingService(
+            self.company_id,
+            bookings=self.bookings,
+        )
 
         self.quotes = quotes or QuoteService()
         self.knowledge = knowledge or KnowledgeService(self.company_id)
@@ -140,20 +152,101 @@ class ToolService:
     async def create_booking(
         self,
         request: CreateBookingRequest,
-    ) -> CreateBookingResponse:
+    ) -> CreateBookingResult:
         """Validate tenant ownership and prepare the repository result for Retell."""
         self._require_company(request.company_id)
+        availability = await self.booking_workflow.check_availability(
+            request.date_time,
+        )
+        if not availability.available:
+            return CreateBookingConflictResponse()
+
         row = await self.bookings.create_booking(request)
         try:
             result = CreateBookingResponse(
                 customer_id=row["customer_id"],
                 booking_id=row["booking_id"],
                 status=row["status"],
+                pending_conflict=(True if availability.pending_conflict else None),
+                message=(
+                    "Booking request received; this time has another pending request."
+                    if availability.pending_conflict
+                    else "Booking created successfully"
+                ),
             )
         except (KeyError, TypeError, ValidationError):
             raise ToolDataError("Booking workflow returned invalid data") from None
         logger.info(
             "Booking tool completed company_id=%s booking_id=%s",
+            self.company_id,
+            result.booking_id,
+        )
+        return result
+
+
+    async def check_booking_availability(
+        self,
+        request: CheckBookingAvailabilityRequest,
+    ) -> CheckBookingAvailabilityResponse:
+        """Return an exact-slot availability decision for Retell."""
+        self._require_company(request.company_id)
+        result = await self.booking_workflow.check_availability(request.date_time)
+        return CheckBookingAvailabilityResponse.model_validate(
+            result.model_dump(),
+        )
+
+
+    async def get_booking_status(
+        self,
+        request: GetBookingStatusRequest,
+    ) -> GetBookingStatusResponse:
+        """Return the nearest relevant booking without exposing customer data."""
+        self._require_company(request.company_id)
+        now = datetime.now(UTC)
+
+        if request.booking_id is not None:
+            row = await self.bookings.get_booking_by_id(
+                request.booking_id,
+                email=request.email,
+                phone=request.phone,
+            )
+            rows = [] if row is None else [row]
+        else:
+            rows = await self.bookings.find_customer_bookings(
+                email=request.email,
+                phone=request.phone,
+                reference_time=now,
+                limit=3,
+            )
+
+        if not rows:
+            return GetBookingStatusResponse(
+                found=False,
+                message="No matching booking was found.",
+            )
+
+        try:
+            candidates = [
+                GetBookingStatusResponse(
+                    found=True,
+                    booking_id=row["id"],
+                    service_type=row.get("service_type"),
+                    date_time=row["date_time"],
+                    status=row["status"],
+                )
+                for row in rows
+            ]
+            upcoming = [item for item in candidates if item.date_time >= now]
+            result = (
+                min(upcoming, key=lambda item: item.date_time)
+                if upcoming
+                else max(candidates, key=lambda item: item.date_time)
+            )
+        except (KeyError, TypeError, ValidationError):
+            raise ToolDataError("Booking lookup returned invalid data") from None
+
+        logger.info(
+            "Booking status tool completed company_id=%s booking_id=%s",
             self.company_id,
             result.booking_id,
         )

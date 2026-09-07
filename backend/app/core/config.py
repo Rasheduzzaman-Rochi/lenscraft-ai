@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     supabase_key: SecretStr = SecretStr("")
     supabase_timeout_seconds: float = Field(default=10, gt=0, le=60)
     agent_company_id: UUID | None = None
+    # Server-only credential for internal administration endpoints.
+    admin_api_key: SecretStr = SecretStr("")
     # Server-only credential used to authenticate signed Retell requests.
     retell_api_key: SecretStr = SecretStr("")
     retell_webhook_tolerance_seconds: int = Field(default=300, ge=30, le=900)

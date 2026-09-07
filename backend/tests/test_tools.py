@@ -17,7 +17,10 @@ from app.core.config import Settings
 from app.main import create_app
 from app.schemas.tools import (
     CalculateQuoteResponse,
+    CheckBookingAvailabilityResponse,
+    CreateBookingConflictResponse,
     CreateLeadResponse,
+    GetBookingStatusResponse,
     KnowledgeSource,
     SearchKnowledgeResponse,
     SearchServiceResponse,
@@ -26,13 +29,16 @@ from app.schemas.tools import (
 from app.services.tool_service import ToolService
 from app.repositories.lead_repository import LeadRepository
 from app.repositories.booking_repository import BookingRepository
+from app.repositories.errors import RepositoryError
 from app.repositories.service_repository import ServiceRepository
 from app.schemas.quote import QuoteCalculation
 from app.schemas.tools import (
     CalculateQuoteRequest,
+    CheckBookingAvailabilityRequest,
     CreateBookingRequest,
     CreateBookingResponse,
     CreateLeadRequest,
+    GetBookingStatusRequest,
     SearchServiceRequest,
 )
 
@@ -115,6 +121,8 @@ class RetellToolApiTests(unittest.TestCase):
 
         def handler(request: httpx.Request) -> httpx.Response:
             requests.append(request)
+            if request.method == "GET":
+                return httpx.Response(200, json=[])
             return httpx.Response(200, json=[{
                 "customer_id": str(customer_id),
                 "booking_id": str(booking_id),
@@ -155,8 +163,9 @@ class RetellToolApiTests(unittest.TestCase):
             "message": "Booking created successfully",
         })
         self.assertEqual(response.headers["cache-control"], "no-store")
-        self.assertEqual(requests[0].url.path, "/rest/v1/rpc/create_booking_tool_workflow")
-        body = json.loads(requests[0].content)
+        self.assertEqual(requests[0].url.path, "/rest/v1/bookings")
+        self.assertEqual(requests[1].url.path, "/rest/v1/rpc/create_booking_tool_workflow")
+        body = json.loads(requests[1].content)
         self.assertEqual(body["p_company_id"], str(self.company))
         self.assertEqual(body["p_customer"]["email"], "jane@example.com")
         self.assertEqual(body["p_customer"]["industry"], "Retail")
@@ -184,6 +193,196 @@ class RetellToolApiTests(unittest.TestCase):
                     response = self.send("/api/v1/tools/create-booking", payload)
                     self.assertEqual(response.status_code, 422)
         client_factory.assert_not_called()
+
+    def test_create_booking_returns_safe_conflict_response(self):
+        with patch.object(
+            ToolService,
+            "create_booking",
+            AsyncMock(return_value=CreateBookingConflictResponse()),
+        ):
+            response = self.send("/api/v1/tools/create-booking", {
+                "company_id": str(self.company),
+                "customer": {"name": "Jane Doe"},
+                "date_time": "2099-06-01T14:30:00Z",
+                "service_type": "Product photography",
+            })
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json(), {
+            "success": False,
+            "conflict": True,
+            "message": "That time is not available.",
+        })
+
+    def test_check_booking_availability_is_a_signed_retell_tool(self):
+        expected = CheckBookingAvailabilityResponse(
+            available=False,
+            reason="confirmed_booking_exists",
+            message="That time is already booked.",
+        )
+        with patch.object(
+            ToolService,
+            "check_booking_availability",
+            AsyncMock(return_value=expected),
+        ) as method:
+            response = self.send("/api/v1/tools/check-booking-availability", {
+                "company_id": str(self.company),
+                "date_time": "2099-06-01T14:30:00Z",
+            })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {
+            "available": False,
+            "reason": "confirmed_booking_exists",
+            "message": "That time is already booked.",
+        })
+        method.assert_awaited_once()
+
+        response = self.send(
+            "/api/v1/tools/check-booking-availability",
+            {
+                "company_id": str(self.company),
+                "date_time": "2099-06-01T14:30:00Z",
+            },
+            valid_signature=False,
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_booking_status_lookup_by_email_returns_safe_fields(self):
+        booking_id = uuid4()
+        expected = GetBookingStatusResponse(
+            found=True,
+            booking_id=booking_id,
+            service_type="Fashion Photography",
+            date_time="2099-09-10T09:00:00Z",
+            status="confirmed",
+        )
+        with patch.object(
+            ToolService, "get_booking_status", AsyncMock(return_value=expected),
+        ) as method:
+            response = self.send("/api/v1/tools/get-booking-status", {
+                "company_id": str(self.company),
+                "email": " CUSTOMER@EXAMPLE.COM ",
+            })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {
+            "found": True,
+            "booking_id": str(booking_id),
+            "service_type": "Fashion Photography",
+            "date_time": "2099-09-10T09:00:00Z",
+            "status": "confirmed",
+        })
+        self.assertEqual(method.await_args.args[0].email, "customer@example.com")
+        self.assertEqual(response.headers["cache-control"], "no-store")
+
+    def test_booking_status_lookup_accepts_phone(self):
+        expected = GetBookingStatusResponse(
+            found=True,
+            booking_id=uuid4(),
+            date_time="2099-09-10T09:00:00Z",
+            status="pending",
+        )
+        with patch.object(
+            ToolService, "get_booking_status", AsyncMock(return_value=expected),
+        ) as method:
+            response = self.send("/api/v1/tools/get-booking-status", {
+                "company_id": str(self.company),
+                "phone": "+8801700000000",
+            })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(method.await_args.args[0].phone, "+8801700000000")
+
+    def test_booking_status_lookup_accepts_booking_id(self):
+        booking_id = uuid4()
+        expected = GetBookingStatusResponse(
+            found=True,
+            booking_id=booking_id,
+            date_time="2099-09-10T09:00:00Z",
+            status="rejected",
+        )
+        with patch.object(
+            ToolService, "get_booking_status", AsyncMock(return_value=expected),
+        ) as method:
+            response = self.send("/api/v1/tools/get-booking-status", {
+                "company_id": str(self.company),
+                "booking_id": str(booking_id),
+            })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(method.await_args.args[0].booking_id, booking_id)
+
+    def test_booking_status_unknown_customer_is_neutral(self):
+        expected = GetBookingStatusResponse(
+            found=False,
+            message="No matching booking was found.",
+        )
+        with patch.object(
+            ToolService, "get_booking_status", AsyncMock(return_value=expected),
+        ):
+            response = self.send("/api/v1/tools/get-booking-status", {
+                "company_id": str(self.company),
+                "email": "unknown@example.com",
+            })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {
+            "found": False,
+            "message": "No matching booking was found.",
+        })
+
+    def test_booking_status_lookup_rejects_invalid_signature_and_company(self):
+        payload = {
+            "company_id": str(self.company),
+            "email": "customer@example.com",
+        }
+        with patch.object(ToolService, "get_booking_status", AsyncMock()) as method:
+            response = self.send(
+                "/api/v1/tools/get-booking-status", payload, valid_signature=False,
+            )
+        self.assertEqual(response.status_code, 401)
+        method.assert_not_awaited()
+
+        response = self.send("/api/v1/tools/get-booking-status", {
+            **payload,
+            "company_id": str(uuid4()),
+        })
+        self.assertEqual(response.status_code, 403)
+
+    def test_booking_status_lookup_requires_identifier(self):
+        with patch.object(ToolService, "get_booking_status", AsyncMock()) as method:
+            response = self.send("/api/v1/tools/get-booking-status", {
+                "company_id": str(self.company),
+            })
+        self.assertEqual(response.status_code, 422)
+        method.assert_not_awaited()
+
+    def test_booking_status_lookup_fails_safely_without_retell_configuration(self):
+        settings = Settings(
+            _env_file=None,
+            environment="production",
+            agent_company_id=self.company,
+            supabase_url="https://project.example.com",
+            supabase_key="server-test-key",
+        )
+        with TestClient(create_app(settings)) as client:
+            response = client.post(
+                "/api/v1/tools/get-booking-status",
+                json={
+                    "company_id": str(self.company),
+                    "email": "customer@example.com",
+                },
+            )
+        self.assertEqual(response.status_code, 503)
+
+    def test_booking_status_repository_errors_are_sanitized(self):
+        with patch.object(
+            ToolService,
+            "get_booking_status",
+            AsyncMock(side_effect=RepositoryError("provider secret")),
+        ):
+            response = self.send("/api/v1/tools/get-booking-status", {
+                "company_id": str(self.company),
+                "email": "customer@example.com",
+            })
+        self.assertEqual(response.status_code, 503)
+        self.assertNotIn("provider secret", response.text)
 
     def test_knowledge_tool_returns_bounded_context_and_source_metadata(self):
         expected = SearchKnowledgeResponse(
@@ -309,6 +508,7 @@ class ToolServiceTests(unittest.IsolatedAsyncioTestCase):
         leads.company_id = str(company)
         bookings = Mock(spec=BookingRepository)
         bookings.company_id = str(company)
+        bookings.find_booking_conflicts = AsyncMock(return_value=[])
         bookings.create_booking = AsyncMock(return_value={
             "customer_id": str(customer_id),
             "booking_id": str(booking_id),
@@ -339,6 +539,85 @@ class ToolServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.booking_id, booking_id)
         bookings.create_booking.assert_awaited_once_with(request)
 
+    async def test_create_booking_stops_before_write_for_confirmed_slot(self):
+        company = uuid4()
+        services = Mock(spec=ServiceRepository)
+        services.company_id = str(company)
+        leads = Mock(spec=LeadRepository)
+        leads.company_id = str(company)
+        bookings = Mock(spec=BookingRepository)
+        bookings.company_id = str(company)
+        bookings.find_booking_conflicts = AsyncMock(return_value=[{
+            "id": str(uuid4()),
+            "date_time": "2099-06-01T14:30:00Z",
+            "status": "confirmed",
+        }])
+        bookings.create_booking = AsyncMock()
+        knowledge = Mock()
+        knowledge.company_id = company
+        service = ToolService(
+            company,
+            services=services,
+            leads=leads,
+            bookings=bookings,
+            quotes=Mock(),
+            knowledge=knowledge,
+        )
+        request = CreateBookingRequest(
+            company_id=company,
+            customer={"name": "Jane"},
+            date_time="2099-06-01T14:30:00Z",
+            service_type="Portrait session",
+        )
+
+        result = await service.create_booking(request)
+
+        self.assertFalse(result.success)
+        self.assertTrue(result.conflict)
+        bookings.create_booking.assert_not_awaited()
+
+    async def test_create_booking_allows_and_reports_pending_slot(self):
+        company = uuid4()
+        customer_id, booking_id = uuid4(), uuid4()
+        services = Mock(spec=ServiceRepository)
+        services.company_id = str(company)
+        leads = Mock(spec=LeadRepository)
+        leads.company_id = str(company)
+        bookings = Mock(spec=BookingRepository)
+        bookings.company_id = str(company)
+        bookings.find_booking_conflicts = AsyncMock(return_value=[{
+            "id": str(uuid4()),
+            "date_time": "2099-06-01T14:30:00Z",
+            "status": "pending",
+        }])
+        bookings.create_booking = AsyncMock(return_value={
+            "customer_id": str(customer_id),
+            "booking_id": str(booking_id),
+            "status": "pending",
+        })
+        knowledge = Mock()
+        knowledge.company_id = company
+        service = ToolService(
+            company,
+            services=services,
+            leads=leads,
+            bookings=bookings,
+            quotes=Mock(),
+            knowledge=knowledge,
+        )
+        request = CreateBookingRequest(
+            company_id=company,
+            customer={"name": "Jane"},
+            date_time="2099-06-01T14:30:00Z",
+            service_type="Portrait session",
+        )
+
+        result = await service.create_booking(request)
+
+        self.assertTrue(result.success)
+        self.assertTrue(result.pending_conflict)
+        bookings.create_booking.assert_awaited_once_with(request)
+
     async def test_booking_tenant_is_checked_before_repository_access(self):
         company = uuid4()
         services = Mock(spec=ServiceRepository)
@@ -362,6 +641,55 @@ class ToolServiceTests(unittest.IsolatedAsyncioTestCase):
                 service_type="Portrait session",
             ))
         bookings.create_booking.assert_not_awaited()
+
+    async def test_booking_status_selects_nearest_upcoming_booking(self):
+        company = uuid4()
+        services = Mock(spec=ServiceRepository)
+        services.company_id = str(company)
+        leads = Mock(spec=LeadRepository)
+        leads.company_id = str(company)
+        bookings = Mock(spec=BookingRepository)
+        bookings.company_id = str(company)
+        now = datetime.now(UTC)
+        bookings.find_customer_bookings = AsyncMock(return_value=[
+            {
+                "id": str(uuid4()),
+                "service_type": "Later session",
+                "date_time": now + timedelta(days=10),
+                "status": "pending",
+            },
+            {
+                "id": str(uuid4()),
+                "service_type": "Nearest session",
+                "date_time": now + timedelta(days=2),
+                "status": "confirmed",
+            },
+            {
+                "id": str(uuid4()),
+                "service_type": "Past session",
+                "date_time": now - timedelta(days=1),
+                "status": "cancelled",
+            },
+        ])
+        knowledge = Mock()
+        knowledge.company_id = company
+        service = ToolService(
+            company,
+            services=services,
+            leads=leads,
+            bookings=bookings,
+            quotes=Mock(),
+            knowledge=knowledge,
+        )
+
+        result = await service.get_booking_status(GetBookingStatusRequest(
+            company_id=company,
+            email="customer@example.com",
+        ))
+
+        self.assertTrue(result.found)
+        self.assertEqual(result.service_type, "Nearest session")
+        bookings.find_customer_bookings.assert_awaited_once()
 
     async def test_create_lead_delegates_one_hashed_idempotent_command(self):
         company = uuid4()

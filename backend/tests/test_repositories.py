@@ -3,6 +3,7 @@
 import json
 import threading
 import unittest
+from datetime import UTC, datetime
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -11,6 +12,7 @@ from pydantic import ValidationError
 from supabase import ClientOptions, create_client
 
 from app.repositories.call_repository import CallRepository
+from app.repositories.booking_repository import BookingRepository
 from app.repositories.customer_repository import CustomerRepository
 from app.repositories.errors import (
     RecordNotFoundError, RepositoryConflictError, RepositoryError, RepositoryIntegrityError,
@@ -19,6 +21,7 @@ from app.repositories.lead_repository import LeadRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.quote_repository import QuoteRepository
 from app.repositories.schemas import CustomerUpdate
+from app.schemas.booking import BookingStatus
 
 
 class RepositoryTests(unittest.IsolatedAsyncioTestCase):
@@ -158,6 +161,157 @@ class RepositoryTests(unittest.IsolatedAsyncioTestCase):
         self.responses.append(httpx.Response(200, json=[]))
         with self.assertRaises(RecordNotFoundError):
             await LeadRepository(self.company, client=self.client).update_lead_status(self.record, 'new')
+
+    async def test_booking_status_update_scopes_company_id_booking_id_and_pending_status(self):
+        self.responses.append(httpx.Response(200, json=[{
+            'id': str(self.record), 'status': 'confirmed',
+        }]))
+        result = await BookingRepository(self.company, client=self.client).update_booking_status(
+            self.record, BookingStatus.CONFIRMED,
+        )
+        request = self.requests[0]
+        self.assertEqual(request.method, 'PATCH')
+        self.assertEqual(request.url.path, '/rest/v1/bookings')
+        self.assertEqual(request.url.params['company_id'], f'eq.{self.company}')
+        self.assertEqual(request.url.params['id'], f'eq.{self.record}')
+        self.assertEqual(request.url.params['status'], 'eq.pending')
+        self.assertEqual(json.loads(request.content), {'status': 'confirmed'})
+        self.assertEqual(result['status'], 'confirmed')
+
+    async def test_booking_status_update_missing_row_is_not_found(self):
+        self.responses.append(httpx.Response(200, json=[]))
+        with self.assertRaises(RecordNotFoundError):
+            await BookingRepository(self.company, client=self.client).update_booking_status(
+                self.record, BookingStatus.REJECTED,
+            )
+
+    async def test_booking_conflict_query_is_tenant_scoped_and_exact(self):
+        self.responses.append(httpx.Response(200, json=[{
+            'id': str(self.record),
+            'date_time': '2026-09-10T09:00:00Z',
+            'status': 'confirmed',
+        }]))
+        requested = datetime.fromisoformat('2026-09-10T15:00:00+06:00')
+        results = await BookingRepository(
+            self.company, client=self.client,
+        ).find_booking_conflicts(
+            requested,
+            exclude_booking_id=self.project,
+        )
+
+        self.assertEqual(results[0]['status'], 'confirmed')
+        params = self.requests[0].url.params
+        self.assertEqual(params['select'], 'id,date_time,status')
+        self.assertEqual(params['company_id'], f'eq.{self.company}')
+        self.assertEqual(params['date_time'], 'eq.2026-09-10T15:00:00+06:00')
+        self.assertEqual(params['status'], 'in.(confirmed,pending)')
+        self.assertEqual(params['id'], f'neq.{self.project}')
+        self.assertEqual(params['limit'], '10')
+
+    async def test_booking_conflict_query_rejects_naive_datetime(self):
+        with self.assertRaises(ValueError):
+            await BookingRepository(
+                self.company, client=self.client,
+            ).find_booking_conflicts(datetime(2026, 9, 10, 9))
+        self.assertEqual(self.requests, [])
+
+    async def test_other_tenant_booking_does_not_create_a_conflict(self):
+        self.responses.append(httpx.Response(200, json=[]))
+        results = await BookingRepository(
+            self.company, client=self.client,
+        ).find_booking_conflicts(
+            datetime.fromisoformat('2026-09-10T09:00:00+00:00'),
+        )
+        self.assertEqual(results, [])
+        self.assertEqual(
+            self.requests[0].url.params['company_id'], f'eq.{self.company}',
+        )
+
+    async def test_booking_lookup_by_id_is_tenant_scoped_and_verifies_contact(self):
+        self.responses.extend([
+            httpx.Response(200, json=[{
+                'id': str(self.record),
+                'customer_id': str(self.customer),
+                'service_type': 'Portrait session',
+                'date_time': '2099-09-10T09:00:00Z',
+                'status': 'confirmed',
+            }]),
+            httpx.Response(200, json=[{'id': str(self.customer)}]),
+        ])
+        result = await BookingRepository(
+            self.company, client=self.client,
+        ).get_booking_by_id(
+            self.record,
+            email=' CUSTOMER@EXAMPLE.COM ',
+            phone='+8801700000000',
+        )
+
+        self.assertEqual(result['id'], str(self.record))
+        self.assertNotIn('customer_id', result)
+        booking_params = self.requests[0].url.params
+        self.assertEqual(booking_params['company_id'], f'eq.{self.company}')
+        self.assertEqual(booking_params['id'], f'eq.{self.record}')
+        customer_params = self.requests[1].url.params
+        self.assertEqual(customer_params['company_id'], f'eq.{self.company}')
+        self.assertEqual(customer_params['id'], f'eq.{self.customer}')
+        self.assertEqual(customer_params['email'], 'eq.customer@example.com')
+        self.assertEqual(customer_params['phone'], 'eq.+8801700000000')
+
+    async def test_cross_tenant_booking_lookup_returns_none(self):
+        self.responses.append(httpx.Response(200, json=[]))
+        result = await BookingRepository(
+            self.company, client=self.client,
+        ).get_booking_by_id(self.record)
+        self.assertIsNone(result)
+        self.assertEqual(
+            self.requests[0].url.params['company_id'], f'eq.{self.company}',
+        )
+
+    async def test_customer_booking_lookup_is_scoped_bounded_and_ordered(self):
+        upcoming_id, recent_id = uuid4(), uuid4()
+        self.responses.extend([
+            httpx.Response(200, json=[
+                {'id': str(self.customer)},
+                {'id': str(uuid4())},
+            ]),
+            httpx.Response(200, json=[{
+                'id': str(upcoming_id),
+                'service_type': 'Product photography',
+                'date_time': '2099-09-10T09:00:00Z',
+                'status': 'pending',
+            }]),
+            httpx.Response(200, json=[{
+                'id': str(recent_id),
+                'service_type': 'Portrait session',
+                'date_time': '2025-09-10T09:00:00Z',
+                'status': 'confirmed',
+            }]),
+        ])
+        results = await BookingRepository(
+            self.company, client=self.client,
+        ).find_customer_bookings(
+            email='customer@example.com',
+            phone='+8801700000000',
+            reference_time=datetime(2026, 9, 7, tzinfo=UTC),
+            limit=3,
+        )
+
+        self.assertEqual([row['id'] for row in results], [
+            str(upcoming_id), str(recent_id),
+        ])
+        customer_params = self.requests[0].url.params
+        self.assertEqual(customer_params['company_id'], f'eq.{self.company}')
+        self.assertEqual(customer_params['email'], 'eq.customer@example.com')
+        self.assertEqual(customer_params['phone'], 'eq.+8801700000000')
+        self.assertEqual(customer_params['limit'], '100')
+        for request in self.requests[1:]:
+            self.assertEqual(request.url.params['company_id'], f'eq.{self.company}')
+            self.assertEqual(request.url.params['limit'], '3')
+            self.assertIn(str(self.customer), request.url.params['customer_id'])
+        self.assertEqual(self.requests[1].url.params['order'], 'date_time.asc')
+        self.assertIn('date_time', self.requests[1].url.params)
+        self.assertEqual(self.requests[2].url.params['order'], 'date_time.desc')
+        self.assertIn('date_time', self.requests[2].url.params)
 
     async def test_provider_errors_are_translated_and_sanitized(self):
         for code, error in [('23505', RepositoryConflictError), ('23503', RepositoryIntegrityError), ('42501', RepositoryError)]:

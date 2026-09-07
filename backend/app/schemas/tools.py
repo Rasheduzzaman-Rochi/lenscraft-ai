@@ -4,9 +4,17 @@ from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.schemas.base import Count, Money, WriteData
+from app.schemas.booking import BookingAvailability, BookingStatus
 from app.schemas.customer import CustomerCreate
 from app.schemas.quote import QuoteCalculateRequest, QuoteCalculation
 
@@ -125,4 +133,69 @@ class CreateBookingResponse(BaseModel):
     customer_id: UUID
     booking_id: UUID
     status: Literal["pending"] = "pending"
+    pending_conflict: Literal[True] | None = None
     message: str = "Booking created successfully"
+
+
+class CreateBookingConflictResponse(BaseModel):
+    success: Literal[False] = False
+    conflict: Literal[True] = True
+    message: str = "That time is not available."
+
+
+CreateBookingResult = CreateBookingResponse | CreateBookingConflictResponse
+
+
+class CheckBookingAvailabilityRequest(ToolRequest):
+    company_id: UUID
+    date_time: AwareDatetime
+
+
+class CheckBookingAvailabilityResponse(BookingAvailability):
+    """Retell-facing exact-slot availability result."""
+
+
+class GetBookingStatusRequest(ToolRequest):
+    """Strong identifiers accepted for a customer-facing booking lookup."""
+
+    company_id: UUID
+    email: str | None = Field(default=None, max_length=320)
+    phone: str | None = Field(default=None, max_length=50)
+    booking_id: UUID | None = None
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str | None) -> str | None:
+        return value.lower() if value else None
+
+    @field_validator("phone")
+    @classmethod
+    def empty_phone_is_absent(cls, value: str | None) -> str | None:
+        return value or None
+
+    @model_validator(mode="after")
+    def require_strong_identifier(self) -> "GetBookingStatusRequest":
+        if self.booking_id is None and self.email is None and self.phone is None:
+            raise ValueError("Provide booking_id, email, or phone")
+        return self
+
+
+class GetBookingStatusResponse(BaseModel):
+    """Minimal booking information safe to return to a voice agent."""
+
+    found: bool
+    booking_id: UUID | None = None
+    service_type: str | None = Field(default=None, max_length=500)
+    date_time: AwareDatetime | None = None
+    status: BookingStatus | None = None
+    message: str | None = Field(default=None, max_length=200)
+
+    @model_validator(mode="after")
+    def validate_result_shape(self) -> "GetBookingStatusResponse":
+        if self.found and (
+            self.booking_id is None or self.date_time is None or self.status is None
+        ):
+            raise ValueError("A found booking requires booking_id, date_time, and status")
+        if not self.found and not self.message:
+            raise ValueError("A missing booking requires a neutral message")
+        return self

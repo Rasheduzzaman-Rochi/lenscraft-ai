@@ -17,10 +17,15 @@ from app.repositories.errors import (
 from app.schemas.tools import (
     CalculateQuoteRequest,
     CalculateQuoteResponse,
+    CheckBookingAvailabilityRequest,
+    CheckBookingAvailabilityResponse,
+    CreateBookingConflictResponse,
     CreateLeadRequest,
     CreateLeadResponse,
     CreateBookingRequest,
-    CreateBookingResponse,
+    CreateBookingResult,
+    GetBookingStatusRequest,
+    GetBookingStatusResponse,
     SearchKnowledgeRequest,
     SearchKnowledgeResponse,
     SearchServiceRequest,
@@ -214,21 +219,26 @@ async def create_lead(
 
 @router.post(
     "/create-booking",
-    response_model=CreateBookingResponse,
+    response_model=CreateBookingResult,
+    response_model_exclude_none=True,
+    responses={409: {"model": CreateBookingConflictResponse}},
     status_code=201,
 )
 async def create_booking(
     payload: CreateBookingRequest,
     response: Response,
     service: ToolDependency,
-) -> CreateBookingResponse:
+) -> CreateBookingResult:
     """Create a customer and pending booking through the booking service workflow."""
 
     no_store(response)
 
     try:
 
-        return await service.create_booking(payload)
+        result = await service.create_booking(payload)
+        if not result.success:
+            response.status_code = 409
+        return result
 
 
     except PermissionError:
@@ -237,7 +247,6 @@ async def create_booking(
             403,
             "Company is not authorized for this agent."
         ) from None
-
 
     except RepositoryIntegrityError:
 
@@ -278,6 +287,79 @@ async def create_booking(
         raise HTTPException(
             502,
             "Booking workflow returned invalid data."
+        ) from None
+
+
+@router.post(
+    "/check-booking-availability",
+    response_model=CheckBookingAvailabilityResponse,
+    response_model_exclude_none=True,
+    response_model_exclude_defaults=True,
+)
+async def check_booking_availability(
+    payload: CheckBookingAvailabilityRequest,
+    response: Response,
+    service: ToolDependency,
+) -> CheckBookingAvailabilityResponse:
+    """Check one exact booking instant for a signed Retell request."""
+    no_store(response)
+
+    try:
+        return await service.check_booking_availability(payload)
+    except PermissionError:
+        raise HTTPException(
+            403,
+            "Company is not authorized for this agent.",
+        ) from None
+    except ValueError:
+        raise HTTPException(
+            422,
+            "Booking availability input is invalid.",
+        ) from None
+    except RepositoryError:
+        logger.warning("Booking availability database operation failed")
+        raise HTTPException(
+            503,
+            "Booking availability is temporarily unavailable.",
+        ) from None
+
+
+@router.post(
+    "/get-booking-status",
+    response_model=GetBookingStatusResponse,
+    response_model_exclude_none=True,
+)
+async def get_booking_status(
+    payload: GetBookingStatusRequest,
+    response: Response,
+    service: ToolDependency,
+) -> GetBookingStatusResponse:
+    """Return a customer-safe booking status to a signed Retell request."""
+    no_store(response)
+
+    try:
+        return await service.get_booking_status(payload)
+    except PermissionError:
+        raise HTTPException(
+            403,
+            "Company is not authorized for this agent.",
+        ) from None
+    except ValueError:
+        raise HTTPException(
+            422,
+            "Booking lookup input is invalid.",
+        ) from None
+    except RepositoryError:
+        logger.warning("Booking status tool database operation failed")
+        raise HTTPException(
+            503,
+            "Booking status is temporarily unavailable.",
+        ) from None
+    except ToolDataError:
+        logger.warning("Booking status tool returned incompatible data")
+        raise HTTPException(
+            502,
+            "Booking status returned invalid data.",
         ) from None
 
 

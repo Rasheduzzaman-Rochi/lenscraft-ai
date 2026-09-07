@@ -1,11 +1,34 @@
-"""Retell request authentication utilities; end-user authentication is not implemented."""
+"""Authentication utilities for internal APIs and signed Retell requests."""
 
 import hashlib
 import hmac
 import re
 import time
+from typing import Annotated
+
+from fastapi import HTTPException, Request, Security
+from fastapi.security import APIKeyHeader
 
 _RETELL_SIGNATURE_PATTERN = re.compile(r"^v=(\d+),d=([0-9a-fA-F]{64})$")
+_ADMIN_API_KEY_HEADER = APIKeyHeader(name="X-Admin-API-Key", auto_error=False)
+
+
+def require_admin_auth(
+    request: Request,
+    supplied_key: Annotated[str | None, Security(_ADMIN_API_KEY_HEADER)],
+) -> None:
+    """Require the configured server-side key for an internal API request."""
+    configured_key = request.app.state.settings.admin_api_key.get_secret_value().strip()
+    if not configured_key:
+        raise HTTPException(503, "Admin API authentication is not configured.")
+
+    candidate = supplied_key or ""
+    if not hmac.compare_digest(candidate.encode("utf-8"), configured_key.encode("utf-8")):
+        raise HTTPException(
+            401,
+            "Invalid admin credentials.",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
 
 
 def verify_retell_request_signature(
