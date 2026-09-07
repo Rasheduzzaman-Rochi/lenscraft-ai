@@ -12,6 +12,11 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+Copy `.env.example` to `.env.local` and configure the FastAPI origin, the
+server-only Retell signing key, and the fixed company UUID. Only
+`NEXT_PUBLIC_API_URL` is public; never add `NEXT_PUBLIC_` to either secret-side
+setting.
+
 ## Production build
 
 ```sh
@@ -31,7 +36,7 @@ The current visual placeholders are CSS-generated and have no external image
 dependency. Replace them with optimized `next/image` assets when approved studio
 photography becomes available.
 
-Forms currently validate and preview their completed state locally. They do not
-submit data or call backend APIs. Only public browser configuration may use
-`NEXT_PUBLIC_` environment variables; Supabase and Retell credentials must remain
-in the backend.
+Browser forms submit to same-origin Next.js route handlers. Those handlers
+validate input, add the trusted company UUID, sign the exact request body on the
+server, and call the existing FastAPI Retell-tool endpoints. Supabase credentials
+remain in the backend, and the Retell key is never included in browser code.
