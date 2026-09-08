@@ -1,5 +1,6 @@
 """Tenant-scoped read queries for the internal administration surface."""
 
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -152,6 +153,31 @@ class AdminRepository(BaseRepository):
 
         return await self._run(execute)
 
+    async def lead_stats(self) -> dict[str, int | Decimal | float]:
+        """Return tenant-scoped lead volume, value, and conversion metrics."""
+        def execute(client) -> dict[str, int | Decimal | float]:
+            rows = self._rows(
+                client.table("leads")
+                .select("status,estimated_value")
+                .eq("company_id", self.company_id)
+                .limit(10000)
+                .execute()
+            )
+            total = len(rows)
+            converted = sum(1 for row in rows if str(row.get("status", "")).lower() == "converted")
+            revenue = sum(
+                (Decimal(str(row["estimated_value"])) for row in rows if row.get("estimated_value") is not None),
+                Decimal("0"),
+            )
+            return {
+                "total": total,
+                "estimated_revenue": revenue,
+                "converted": converted,
+                "conversion_rate": (converted / total * 100) if total else 0,
+            }
+
+        return await self._run(execute)
+
     async def recent_leads(self, *, limit: int = 6) -> list[Record]:
         """Return recent leads and their tenant-owned customer identity fields."""
         if type(limit) is not int or not 1 <= limit <= 20:
@@ -299,6 +325,7 @@ class AdminRepository(BaseRepository):
             ) or {}
             return {
                 "id": lead.get("id"),
+                "customer_id": lead.get("customer_id"),
                 "customer_name": customer.get("name"),
                 "email": customer.get("email"),
                 "phone": customer.get("phone"),
@@ -314,3 +341,13 @@ class AdminRepository(BaseRepository):
             }
 
         return await self._run(execute)
+
+    async def update_lead_status(self, lead_id: UUID, status: str) -> Record:
+        """Update one tenant lead status and return the changed record."""
+        return await self._run(lambda client: self._one(
+            client.table("leads").update({"status": status})
+            .eq("company_id", self.company_id)
+            .eq("id", str(lead_id))
+            .execute(),
+            required=True,
+        ))

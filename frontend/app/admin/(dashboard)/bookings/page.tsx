@@ -99,7 +99,7 @@ export default async function AdminBookingsPage({
                     <td className="px-5 py-5"><StatusBadge status={booking.status} /></td>
                     <td className="whitespace-nowrap px-5 py-5 text-xs text-ink/45">{formatDateTime(booking.created_at)}</td>
                     <td className="max-w-[220px] px-5 py-5 text-xs leading-5 text-ink/50">{booking.notes ?? "—"}</td>
-                    <td className="px-5 py-5"><Link href={`/admin/bookings/${booking.id}`} className="text-[8px] font-semibold uppercase tracking-[0.15em] text-bronze hover:text-ink">View details</Link>{booking.status === "pending" ? <div className="mt-3"><BookingActions bookingId={booking.id} /></div> : null}</td>
+                    <td className="px-5 py-5"><Link href={`/admin/bookings/${booking.id}`} className="text-[8px] font-semibold uppercase tracking-[0.15em] text-bronze hover:text-ink">View details</Link>{booking.status.trim().toLowerCase() === "pending" ? <div className="mt-3"><BookingActions bookingId={booking.id} currentStatus={booking.status} /></div> : null}</td>
                   </tr>
                 ))}
               </tbody>
@@ -115,7 +115,7 @@ export default async function AdminBookingsPage({
                   <div><dt className="eyebrow">Appointment</dt><dd className="mt-2 text-sm">{formatDateTime(booking.date_time)}</dd></div>
                   <div className="sm:col-span-2"><dt className="eyebrow">Notes</dt><dd className="mt-2 text-sm leading-6 text-ink/55">{booking.notes ?? "No notes supplied."}</dd></div>
                 </dl>
-                <div className="mt-5 flex items-center justify-between gap-4"><Link href={`/admin/bookings/${booking.id}`} className="text-[9px] font-semibold uppercase tracking-[0.15em] text-bronze">View details</Link>{booking.status === "pending" ? <BookingActions bookingId={booking.id} /> : null}</div>
+                <div className="mt-5 flex items-center justify-between gap-4"><Link href={`/admin/bookings/${booking.id}`} className="text-[9px] font-semibold uppercase tracking-[0.15em] text-bronze">View details</Link>{booking.status.trim().toLowerCase() === "pending" ? <BookingActions bookingId={booking.id} currentStatus={booking.status} /> : null}</div>
               </article>
             ))}
           </div>

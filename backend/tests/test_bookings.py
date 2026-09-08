@@ -175,12 +175,51 @@ class BookingStatusServiceTests(unittest.IsolatedAsyncioTestCase):
         company = uuid4()
         bookings = Mock(spec=BookingRepository)
         bookings.company_id = str(company)
+        bookings.get_booking_by_id = AsyncMock(return_value={
+            'id': str(uuid4()), 'status': 'pending',
+        })
         bookings.update_booking_status = AsyncMock()
         service = BookingService(company, bookings=bookings)
 
         with self.assertRaises(BookingStatusTransitionError):
             await service.update_status(uuid4(), BookingStatus.PENDING)
         bookings.update_booking_status.assert_not_awaited()
+
+    async def test_confirmed_booking_can_be_cancelled(self):
+        booking_id = uuid4()
+        service, bookings = self.service([])
+        bookings.get_booking_by_id.return_value = {
+            'id': str(booking_id), 'status': 'confirmed',
+        }
+        bookings.update_booking_status.return_value = {
+            'id': str(booking_id), 'status': 'cancelled',
+        }
+
+        result = await service.update_status(booking_id, BookingStatus.CANCELLED)
+
+        self.assertEqual(result.status, BookingStatus.CANCELLED)
+        bookings.update_booking_status.assert_awaited_once_with(
+            booking_id,
+            BookingStatus.CANCELLED,
+            expected_status=BookingStatus.CONFIRMED,
+        )
+
+    async def test_invalid_status_transitions_are_conflicts(self):
+        cases = [
+            ('confirmed', BookingStatus.CONFIRMED),
+            ('confirmed', BookingStatus.REJECTED),
+            ('rejected', BookingStatus.CONFIRMED),
+            ('cancelled', BookingStatus.CONFIRMED),
+        ]
+        for current, requested in cases:
+            with self.subTest(current=current, requested=requested):
+                service, bookings = self.service([])
+                bookings.get_booking_by_id.return_value = {
+                    'id': str(uuid4()), 'status': current,
+                }
+                with self.assertRaises(BookingStatusTransitionError):
+                    await service.update_status(uuid4(), requested)
+                bookings.update_booking_status.assert_not_awaited()
 
     async def test_empty_slot_is_available(self):
         service, _ = self.service([])

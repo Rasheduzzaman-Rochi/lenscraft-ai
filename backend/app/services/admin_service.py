@@ -6,14 +6,18 @@ from pydantic import ValidationError
 
 from app.repositories.admin_repository import AdminRepository
 from app.schemas.admin import (
+    AdminBookingCreate,
     AdminBooking,
     AdminBookingList,
     AdminBookingStats,
     AdminDashboard,
     AdminLead,
     AdminLeadList,
+    AdminLeadStats,
+    AdminLeadStatusUpdate,
 )
 from app.schemas.booking import BookingStatus
+from app.schemas.tools import CreateBookingResponse
 
 
 class AdminDataError(ValueError):
@@ -53,10 +57,12 @@ class AdminService:
 
     async def dashboard(self) -> AdminDashboard:
         counts = await self.repository.booking_counts()
+        lead_stats = await self.repository.lead_stats()
         leads = await self.repository.recent_leads()
         try:
             return AdminDashboard(
                 bookings=AdminBookingStats.model_validate(counts),
+            leads=AdminLeadStats.model_validate(lead_stats),
                 recent_leads=[AdminLead.model_validate(row) for row in leads],
             )
         except ValidationError:
@@ -91,3 +97,8 @@ class AdminService:
             return AdminLead.model_validate(row)
         except ValidationError:
             raise AdminDataError("Stored lead data is invalid") from None
+
+    async def update_lead_status(self, lead_id: UUID, status: AdminLeadStatusUpdate) -> AdminLead:
+        row = await self.repository.update_lead_status(lead_id, status.status)
+        lead = await self.get_lead(lead_id)
+        return lead

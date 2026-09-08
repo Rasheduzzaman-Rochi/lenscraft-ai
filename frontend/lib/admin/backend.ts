@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { AdminBooking, AdminBookingList, AdminDashboard, AdminLead, AdminLeadList, BookingStatus } from "@/lib/admin/types";
+import type { AdminBooking, AdminBookingList, AdminDashboard, AdminLead, AdminLeadList, AdminLeadStatus, BookingStatus } from "@/lib/admin/types";
 
 const REQUEST_TIMEOUT_MS = 12_000;
 
@@ -113,4 +113,25 @@ export function getAdminLeads(options: { limit?: number; offset?: number } = {})
 
 export function getAdminLead(leadId: string) {
   return request<AdminLead>(`/api/v1/admin/leads/${encodeURIComponent(leadId)}`);
+}
+
+export function updateAdminLeadStatus(leadId: string, status: AdminLeadStatus) {
+  return request<AdminLead>(`/api/admin/leads/${encodeURIComponent(leadId)}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function createAdminBooking(payload: {
+  customer: { name: string; email?: string; phone?: string; business_name?: string; industry?: string };
+  date_time: string;
+  service_type: string;
+  notes?: string;
+}) {
+  return request<{ customer_id: string; booking_id: string; status: BookingStatus; message: string }>("/api/admin/bookings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 }

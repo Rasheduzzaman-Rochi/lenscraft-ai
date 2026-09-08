@@ -7,15 +7,29 @@ import { useState } from "react";
 import type { BookingStatus } from "@/lib/admin/types";
 import { cn } from "@/lib/utils";
 
-const actions: Array<{ status: Exclude<BookingStatus, "pending">; label: string; className: string }> = [
+type ActionStatus = Exclude<BookingStatus, "pending">;
+
+const pendingActions: Array<{ status: ActionStatus; label: string; className: string }> = [
   { status: "confirmed", label: "Confirm", className: "bg-ink text-paper hover:bg-bronze" },
   { status: "rejected", label: "Reject", className: "border border-ink/15 hover:border-[#8d433b] hover:text-[#8d433b]" },
 ];
 
-export function BookingActions({ bookingId, allowCancel = false }: { bookingId: string; allowCancel?: boolean }) {
+const cancelAction = {
+  status: "cancelled" as const,
+  label: "Cancel",
+  className: "border border-ink/15 hover:border-[#8d433b] hover:text-[#8d433b]",
+};
+
+export function BookingActions({ bookingId, currentStatus }: { bookingId: string; currentStatus: BookingStatus }) {
   const router = useRouter();
   const [busy, setBusy] = useState<BookingStatus | null>(null);
   const [message, setMessage] = useState<string>();
+  const normalizedStatus = currentStatus.trim().toLowerCase() as BookingStatus;
+  const actions = normalizedStatus === "pending"
+    ? pendingActions
+    : normalizedStatus === "confirmed"
+      ? [cancelAction]
+      : [];
 
   async function update(status: Exclude<BookingStatus, "pending">) {
     const accepted = window.confirm(`Mark this booking as ${status}? This action cannot be reversed here.`);
@@ -34,7 +48,7 @@ export function BookingActions({ bookingId, allowCancel = false }: { bookingId: 
         return;
       }
       setMessage(`Booking ${status} successfully.`);
-      window.setTimeout(() => router.refresh(), 450);
+      router.refresh();
     } catch {
       setMessage("The booking could not be updated. Please try again.");
     } finally {
@@ -45,7 +59,7 @@ export function BookingActions({ bookingId, allowCancel = false }: { bookingId: 
   return (
     <div>
       <div className="flex flex-wrap gap-2">
-        {(allowCancel ? [...actions, { status: "cancelled" as const, label: "Cancel", className: "border border-ink/15 hover:border-[#8d433b] hover:text-[#8d433b]" }] : actions).map((action) => (
+        {actions.map((action) => (
           <button
             key={action.status}
             type="button"

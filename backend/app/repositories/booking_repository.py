@@ -36,15 +36,19 @@ class BookingRepository(BaseRepository):
         ))
 
     async def update_booking_status(
-        self, booking_id: str, status: BookingStatus,
+        self,
+        booking_id: str,
+        status: BookingStatus,
+        *,
+        expected_status: BookingStatus,
     ) -> Record:
-        """Update one booking status within this repository's company."""
+        """Update one booking status with an atomic expected-state check."""
         booking_id = identifier(booking_id)
         return await self._run(lambda client: self._one(
             client.table("bookings").update({"status": status.value})
             .eq("company_id", self.company_id)
             .eq("id", booking_id)
-            .eq("status", BookingStatus.PENDING.value)
+            .eq("status", expected_status.value)
             .execute(),
             required=True,
         ))

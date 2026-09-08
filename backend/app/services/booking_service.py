@@ -38,15 +38,28 @@ class BookingService:
     async def update_status(
         self, booking_id: UUID, status: BookingStatus,
     ) -> UpdateBookingStatusResponse:
-        if status is BookingStatus.PENDING:
+        booking = await self.bookings.get_booking_by_id(booking_id)
+        if booking is None:
+            raise RecordNotFoundError("Booking not found in this company")
+
+        try:
+            current_status = BookingStatus(booking["status"])
+        except (KeyError, TypeError, ValueError):
+            raise ValueError("Booking status is invalid") from None
+
+        allowed_transitions = {
+            BookingStatus.PENDING: {
+                BookingStatus.CONFIRMED,
+                BookingStatus.REJECTED,
+            },
+            BookingStatus.CONFIRMED: {BookingStatus.CANCELLED},
+        }
+        if status not in allowed_transitions.get(current_status, set()):
             raise BookingStatusTransitionError(
-                "A booking status update must confirm, reject, or cancel a booking"
+                f"Cannot change a {current_status.value} booking to {status.value}"
             )
 
         if status is BookingStatus.CONFIRMED:
-            booking = await self.bookings.get_booking_by_id(booking_id)
-            if booking is None or booking.get("status") != BookingStatus.PENDING.value:
-                raise RecordNotFoundError("Pending booking not found in this company")
             if "date_time" not in booking:
                 raise ValueError("Booking date_time is missing")
             availability = await self.check_availability(
@@ -57,7 +70,11 @@ class BookingService:
                 raise BookingSlotConflictError("That time is already booked")
 
         try:
-            row = await self.bookings.update_booking_status(booking_id, status)
+            row = await self.bookings.update_booking_status(
+                booking_id,
+                status,
+                expected_status=current_status,
+            )
         except RepositoryConflictError:
             if status is BookingStatus.CONFIRMED:
                 raise BookingSlotConflictError("That time is already booked") from None

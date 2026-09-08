@@ -47,7 +47,7 @@ async def update_booking_status(
     _admin_auth: AdminAuthDependency,
     service: BookingDependency,
 ) -> UpdateBookingStatusResponse:
-    """Confirm, reject, or cancel a pending booking for the configured tenant."""
+    """Apply one allowed status transition for the configured tenant."""
     response.headers["Cache-Control"] = "no-store"
     if payload.company_id != service.company_id:
         raise HTTPException(403, "Company is not enabled for this admin endpoint.")
@@ -59,7 +59,7 @@ async def update_booking_status(
     except BookingSlotConflictError:
         raise HTTPException(409, "That time is already booked.") from None
     except BookingStatusTransitionError as exc:
-        raise HTTPException(422, str(exc)) from None
+        raise HTTPException(409, str(exc)) from None
     except ValueError:
         raise HTTPException(422, "Booking status update is invalid.") from None
     except RepositoryError:

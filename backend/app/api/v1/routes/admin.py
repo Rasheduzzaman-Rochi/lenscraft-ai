@@ -8,7 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from app.core.security import require_admin_auth
 from app.repositories.errors import RepositoryError
-from app.schemas.admin import AdminBooking, AdminBookingList, AdminDashboard, AdminLead, AdminLeadList
+from app.schemas.admin import AdminBooking, AdminBookingCreate, AdminBookingList, AdminDashboard, AdminLead, AdminLeadList, AdminLeadStatusUpdate
+from app.schemas.tools import CreateBookingResponse
+from app.repositories.booking_repository import BookingRepository
+from app.repositories.errors import RecordNotFoundError, RepositoryConflictError, RepositoryIntegrityError
 from app.schemas.booking import BookingStatus
 from app.services.admin_service import AdminDataError, AdminService
 
@@ -121,3 +124,53 @@ async def get_lead(
     except RepositoryError:
         logger.warning("Admin lead query failed")
         raise HTTPException(503, "Lead data is temporarily unavailable.") from None
+
+
+@router.patch("/leads/{lead_id}/status", response_model=AdminLead)
+async def update_lead_status(
+    lead_id: UUID,
+    payload: AdminLeadStatusUpdate,
+    response: Response,
+    _admin_auth: AdminAuthDependency,
+    service: AdminServiceDependency,
+) -> AdminLead:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return await service.update_lead_status(lead_id, payload)
+    except RecordNotFoundError:
+        raise HTTPException(404, "Lead not found.") from None
+    except RepositoryError:
+        logger.warning("Admin lead status update failed")
+        raise HTTPException(503, "Lead status is temporarily unavailable.") from None
+
+
+@router.post("/bookings", response_model=CreateBookingResponse, status_code=201)
+async def create_admin_booking(
+    payload: AdminBookingCreate,
+    response: Response,
+    _admin_auth: AdminAuthDependency,
+    request: Request,
+) -> CreateBookingResponse:
+    response.headers["Cache-Control"] = "no-store"
+    settings = request.app.state.settings
+    if settings.agent_company_id is None:
+        raise HTTPException(503, "Admin company is not configured.")
+    if settings.supabase_url is None or not settings.supabase_key.get_secret_value().strip():
+        raise HTTPException(503, "Admin database is not configured.")
+    try:
+        row = await BookingRepository(settings.agent_company_id).create_booking({
+            "company_id": settings.agent_company_id,
+            **payload.model_dump(mode="json"),
+        })
+        return CreateBookingResponse(
+            customer_id=row["customer_id"],
+            booking_id=row["booking_id"],
+            status=row["status"],
+        )
+    except (RepositoryConflictError, RepositoryIntegrityError):
+        raise HTTPException(409, "Booking could not be created with these details.") from None
+    except ValueError:
+        raise HTTPException(422, "Booking input is invalid.") from None
+    except RepositoryError:
+        logger.warning("Admin booking creation failed")
+        raise HTTPException(503, "Booking creation is temporarily unavailable.") from None

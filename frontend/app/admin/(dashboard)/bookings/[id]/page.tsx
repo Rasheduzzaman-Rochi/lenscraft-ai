@@ -23,6 +23,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
   }
 
   const booking = result.value;
+  const normalizedStatus = booking.status.trim().toLowerCase() as BookingStatus;
   return (
     <div className="mx-auto max-w-5xl">
       <Link href="/admin/bookings" className="inline-flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink/45 hover:text-ink"><ArrowLeft className="h-3.5 w-3.5" /> Back to bookings</Link>
@@ -31,7 +32,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
         <section className="border border-ink/10 bg-paper p-6 sm:p-8"><p className="eyebrow">Appointment</p><dl className="mt-6 grid gap-6 sm:grid-cols-2"><div><dt className="eyebrow">Service</dt><dd className="mt-2 font-serif text-2xl">{booking.service ?? "Unspecified"}</dd></div><div><dt className="eyebrow">Date & time</dt><dd className="mt-2 text-sm leading-6">{formatDateTime(booking.date_time)}</dd></div><div className="sm:col-span-2"><dt className="eyebrow">Notes</dt><dd className="mt-2 text-sm leading-6 text-ink/60">{booking.notes ?? "No notes supplied."}</dd></div></dl></section>
         <section className="border border-ink/10 bg-paper p-6 sm:p-8"><p className="eyebrow">Customer</p><h2 className="mt-3 font-serif text-3xl">{booking.customer_name}</h2><dl className="mt-6 space-y-5 text-sm"><div><dt className="eyebrow">Email</dt><dd className="mt-2"><a href={booking.email ? `mailto:${booking.email}` : undefined} className="inline-flex items-center gap-2 text-bronze hover:text-ink"><Mail className="h-3.5 w-3.5" />{booking.email ?? "Not supplied"}</a></dd></div><div><dt className="eyebrow">Phone</dt><dd className="mt-2"><a href={booking.phone ? `tel:${booking.phone}` : undefined} className="inline-flex items-center gap-2 text-bronze hover:text-ink"><Phone className="h-3.5 w-3.5" />{booking.phone ?? "Not supplied"}</a></dd></div><div><dt className="eyebrow">Company / brand</dt><dd className="mt-2 text-ink/60">{booking.business_name ?? "Not supplied"}</dd></div><div><dt className="eyebrow">Industry</dt><dd className="mt-2 text-ink/60">{booking.industry ?? "Not supplied"}</dd></div></dl></section>
       </div>
-      {booking.status === "pending" ? <div className="mt-6 border border-ink/10 bg-paper p-6"><p className="eyebrow">Actions</p><div className="mt-4"><BookingActions bookingId={booking.id} /></div></div> : booking.status === "confirmed" ? <div className="mt-6 border border-ink/10 bg-paper p-6"><p className="eyebrow">Actions</p><div className="mt-4"><BookingActions bookingId={booking.id} allowCancel /></div></div> : null}
+      {normalizedStatus === "pending" || normalizedStatus === "confirmed" ? <div className="mt-6 border border-ink/10 bg-paper p-6"><p className="eyebrow">Actions</p><div className="mt-4"><BookingActions bookingId={booking.id} currentStatus={normalizedStatus} /></div></div> : null}
     </div>
   );
 }

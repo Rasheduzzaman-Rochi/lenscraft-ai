@@ -30,10 +30,14 @@ export type AdminLead = {
   estimated_value: string | number | null;
   created_at: string;
   phone: string | null;
+  business_name: string | null;
+  industry: string | null;
   service: string | null;
   source?: string | null;
   project_details: Record<string, unknown>;
 };
+
+export type AdminLeadStatus = "new" | "contacted" | "qualified" | "converted" | "lost";
 
 export type AdminLeadList = {
   items: AdminLead[];
@@ -43,12 +47,23 @@ export type AdminLeadList = {
 };
 
 export type AdminDashboard = {
-  bookings: {
+  bookings?: {
     total: number;
     pending: number;
     confirmed: number;
-    rejected: number;
-    cancelled: number;
+    rejected?: number;
+    cancelled?: number;
   };
-  recent_leads: AdminLead[];
+  leads?: {
+    total?: number;
+    new?: number;
+    converted?: number;
+    estimated_revenue?: string | number;
+    conversion_rate?: number;
+  };
+  revenue?: string | number;
+  conversion_rate?: number;
+  total_leads?: number;
+  converted_leads?: number;
+  recent_leads?: AdminLead[];
 };

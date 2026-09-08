@@ -167,7 +167,9 @@ class RepositoryTests(unittest.IsolatedAsyncioTestCase):
             'id': str(self.record), 'status': 'confirmed',
         }]))
         result = await BookingRepository(self.company, client=self.client).update_booking_status(
-            self.record, BookingStatus.CONFIRMED,
+            self.record,
+            BookingStatus.CONFIRMED,
+            expected_status=BookingStatus.PENDING,
         )
         request = self.requests[0]
         self.assertEqual(request.method, 'PATCH')
@@ -182,7 +184,9 @@ class RepositoryTests(unittest.IsolatedAsyncioTestCase):
         self.responses.append(httpx.Response(200, json=[]))
         with self.assertRaises(RecordNotFoundError):
             await BookingRepository(self.company, client=self.client).update_booking_status(
-                self.record, BookingStatus.REJECTED,
+                self.record,
+                BookingStatus.REJECTED,
+                expected_status=BookingStatus.PENDING,
             )
 
     async def test_booking_conflict_query_is_tenant_scoped_and_exact(self):

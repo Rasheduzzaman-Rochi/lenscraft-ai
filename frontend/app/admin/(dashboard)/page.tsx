@@ -3,7 +3,8 @@ import Link from "next/link";
 
 import { AdminBackendError, getAdminBookings, getAdminDashboard } from "@/lib/admin/backend";
 import { RetryButton } from "@/components/admin/retry-button";
-import type { AdminBooking } from "@/lib/admin/types";
+import { BookingCalendar } from "@/components/admin/booking-calendar";
+import type { AdminBooking, AdminDashboard } from "@/lib/admin/types";
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", {
@@ -25,13 +26,40 @@ function StatusBadge({ status }: { status: AdminBooking["status"] }) {
   return <span className={`inline-flex px-3 py-2 text-[8px] font-semibold uppercase tracking-[0.16em] ${status === "confirmed" ? "bg-[#dce8db] text-[#39523a]" : status === "pending" ? "bg-[#eee3cc] text-[#765b2c]" : status === "rejected" ? "bg-[#eedbd7] text-[#7b4038]" : "bg-ink/5 text-ink/45"}`}>{status}</span>;
 }
 
+function numberValue(value: unknown, fallback = 0) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeDashboard(raw: AdminDashboard) {
+  const bookings: Partial<NonNullable<AdminDashboard["bookings"]>> = raw.bookings ?? {};
+  const leads: NonNullable<AdminDashboard["leads"]> = raw.leads ?? {};
+  return {
+    bookings: {
+      total: numberValue(bookings.total),
+      pending: numberValue(bookings.pending),
+      confirmed: numberValue(bookings.confirmed),
+      rejected: numberValue(bookings.rejected),
+      cancelled: numberValue(bookings.cancelled),
+    },
+    leads: {
+      total: numberValue(leads.total ?? raw.total_leads),
+      converted: numberValue(leads.converted ?? raw.converted_leads),
+      estimatedRevenue: numberValue(leads.estimated_revenue ?? raw.revenue),
+      conversionRate: numberValue(leads.conversion_rate ?? raw.conversion_rate),
+    },
+    recentLeads: Array.isArray(raw.recent_leads) ? raw.recent_leads : [],
+  };
+}
+
 export default async function AdminDashboardPage() {
   const [dashboardResult, bookingsResult] = await Promise.allSettled([
     getAdminDashboard(),
-    getAdminBookings({ limit: 5 }),
+    getAdminBookings({ limit: 100 }),
   ]);
   const data = dashboardResult.status === "fulfilled" ? dashboardResult.value : null;
   const bookings = bookingsResult.status === "fulfilled" ? bookingsResult.value.items : [];
+  const calendarBookings = bookings.filter((booking) => ["pending", "confirmed"].includes(booking.status.trim().toLowerCase()));
 
   if (!data) {
     const error = dashboardResult.status === "rejected" ? dashboardResult.reason : null;
@@ -49,11 +77,14 @@ export default async function AdminDashboardPage() {
     );
   }
 
+  const dashboard = normalizeDashboard(data);
   const stats = [
-    { label: "Total bookings", value: data.bookings.total, icon: CalendarDays },
-    { label: "Pending review", value: data.bookings.pending, icon: CalendarClock },
-    { label: "Confirmed", value: data.bookings.confirmed, icon: CalendarCheck },
-    { label: "Rejected / cancelled", value: data.bookings.rejected + data.bookings.cancelled, icon: UserRoundPlus },
+    { label: "Total leads", value: dashboard.leads.total, icon: UserRoundPlus },
+    { label: "Total bookings", value: dashboard.bookings.total, icon: CalendarDays },
+    { label: "Pending review", value: dashboard.bookings.pending, icon: CalendarClock },
+    { label: "Confirmed", value: dashboard.bookings.confirmed, icon: CalendarCheck },
+    { label: "Estimated revenue", value: `৳${dashboard.leads.estimatedRevenue.toLocaleString("en-BD")}`, icon: UserRoundPlus },
+    { label: "Conversion rate", value: `${dashboard.leads.conversionRate.toFixed(1)}%`, icon: UserRoundPlus },
   ];
 
   return (
@@ -74,7 +105,7 @@ export default async function AdminDashboardPage() {
               <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-ink/40">{label}</p>
               <Icon className="h-4 w-4 text-bronze" strokeWidth={1.4} />
             </div>
-            <p className="mt-8 font-serif text-5xl tracking-[-0.04em]">{value.toLocaleString()}</p>
+            <p className="mt-8 font-serif text-5xl tracking-[-0.04em]">{typeof value === "number" ? value.toLocaleString() : value}</p>
           </article>
         ))}
       </div>
@@ -85,11 +116,11 @@ export default async function AdminDashboardPage() {
             <p className="eyebrow">Sales enquiries</p>
             <h2 className="mt-2 font-serif text-3xl">Recent leads</h2>
           </div>
-          <span className="text-[9px] uppercase tracking-[0.16em] text-ink/35">Latest {data.recent_leads.length}</span>
+          <span className="text-[9px] uppercase tracking-[0.16em] text-ink/35">Latest {dashboard.recentLeads.length}</span>
         </div>
-        {data.recent_leads.length ? (
+        {dashboard.recentLeads.length ? (
           <div className="divide-y divide-ink/10">
-            {data.recent_leads.map((lead) => (
+            {dashboard.recentLeads.map((lead) => (
               <article key={lead.id} className="grid gap-3 px-6 py-5 sm:grid-cols-[1fr_1.4fr_auto] sm:items-center sm:px-8">
                 <div>
                   <p className="font-serif text-xl">{lead.customer_name ?? "Unassigned enquiry"}</p>
@@ -107,6 +138,8 @@ export default async function AdminDashboardPage() {
           <p className="px-8 py-12 text-sm text-ink/45">No leads have been recorded yet.</p>
         )}
       </section>
+
+      {bookingsResult.status === "fulfilled" ? <BookingCalendar bookings={calendarBookings} /> : <section className="mt-10 border border-[#b36a60]/30 bg-[#b36a60]/10 p-7"><p className="eyebrow text-[#85483f]">Calendar unavailable</p><h2 className="mt-3 font-serif text-3xl">The booking calendar could not be loaded.</h2><p className="mt-3 text-sm text-ink/55">The overview metrics are available, but schedule data did not respond.</p><div className="mt-6"><RetryButton /></div></section>}
 
       <section className="mt-10 border border-ink/10 bg-paper">
         <div className="flex items-center justify-between border-b border-ink/10 px-6 py-5 sm:px-8">
