@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { AdminLoginForm } from "@/components/admin/admin-login-form";
 import { hasAdminSession } from "@/lib/admin/session";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminLoginPage() {
   if (await hasAdminSession()) redirect("/admin");
 

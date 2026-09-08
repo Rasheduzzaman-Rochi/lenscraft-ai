@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { AdminBackendError, getAdminDashboard } from "@/lib/admin/backend";
+import { adminConnectionMessage, adminProxyStatus, getAdminDashboard } from "@/lib/admin/backend";
 import { hasAdminSession } from "@/lib/admin/session";
 
 export const runtime = "nodejs";
@@ -19,9 +19,9 @@ export async function GET() {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    const status = error instanceof AdminBackendError && error.status === 401 ? 401 : 503;
+    const status = adminProxyStatus(error);
     return NextResponse.json(
-      { message: "Dashboard data is temporarily unavailable." },
+      { message: adminConnectionMessage(error) },
       { status, headers: { "Cache-Control": "no-store" } },
     );
   }

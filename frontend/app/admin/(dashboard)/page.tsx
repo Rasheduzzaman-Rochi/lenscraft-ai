@@ -1,7 +1,7 @@
 import { ArrowRight, CalendarCheck, CalendarClock, CalendarDays, CircleAlert, UserRoundPlus } from "lucide-react";
 import Link from "next/link";
 
-import { AdminBackendError, getAdminBookings, getAdminDashboard } from "@/lib/admin/backend";
+import { adminConnectionMessage, getAdminBookings, getAdminDashboard } from "@/lib/admin/backend";
 import { RetryButton } from "@/components/admin/retry-button";
 import { BookingCalendar } from "@/components/admin/booking-calendar";
 import type { AdminBooking, AdminDashboard } from "@/lib/admin/types";
@@ -31,7 +31,7 @@ function numberValue(value: unknown, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function normalizeDashboard(raw: AdminDashboard) {
+function normalizeDashboard(raw: Partial<AdminDashboard> = {}) {
   const bookings: Partial<NonNullable<AdminDashboard["bookings"]>> = raw.bookings ?? {};
   const leads: NonNullable<AdminDashboard["leads"]> = raw.leads ?? {};
   return {
@@ -60,24 +60,15 @@ export default async function AdminDashboardPage() {
   const data = dashboardResult.status === "fulfilled" ? dashboardResult.value : null;
   const bookings = bookingsResult.status === "fulfilled" ? bookingsResult.value.items : [];
   const calendarBookings = bookings.filter((booking) => ["pending", "confirmed"].includes(booking.status.trim().toLowerCase()));
-
-  if (!data) {
-    const error = dashboardResult.status === "rejected" ? dashboardResult.reason : null;
-    const message = error instanceof AdminBackendError && error.detail === "Admin API configuration is incomplete."
-      ? "The server admin connection is not configured yet. Add ADMIN_API_KEY to the frontend server environment."
-      : "The studio overview is temporarily unavailable. Check the connection and try again.";
-    return (
-      <div className="border border-[#b36a60]/30 bg-[#b36a60]/10 p-7">
-        <CircleAlert className="h-5 w-5 text-[#85483f]" />
-        <p className="eyebrow text-[#85483f]">Data unavailable</p>
-        <h1 className="mt-3 font-serif text-4xl">The studio overview could not be loaded.</h1>
-        <p className="mt-4 max-w-xl text-sm leading-6 text-ink/55">{message}</p>
-        <div className="mt-6"><RetryButton /></div>
-      </div>
-    );
+  const dashboardError = dashboardResult.status === "rejected" ? dashboardResult.reason : null;
+  const dashboard = normalizeDashboard(data ?? {});
+  if (!data && bookingsResult.status === "fulfilled") {
+    dashboard.bookings.total = bookingsResult.value.total;
+    dashboard.bookings.pending = bookings.filter((booking) => booking.status === "pending").length;
+    dashboard.bookings.confirmed = bookings.filter((booking) => booking.status === "confirmed").length;
+    dashboard.bookings.rejected = bookings.filter((booking) => booking.status === "rejected").length;
+    dashboard.bookings.cancelled = bookings.filter((booking) => booking.status === "cancelled").length;
   }
-
-  const dashboard = normalizeDashboard(data);
   const stats = [
     { label: "Total leads", value: dashboard.leads.total, icon: UserRoundPlus },
     { label: "Total bookings", value: dashboard.bookings.total, icon: CalendarDays },
@@ -97,6 +88,19 @@ export default async function AdminDashboardPage() {
         </div>
         <Link href="/admin/bookings" className="inline-flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.2em] transition hover:text-bronze">Manage bookings <ArrowRight className="h-4 w-4" /></Link>
       </div>
+
+      {dashboardError ? (
+        <section className="mt-8 border border-[#b36a60]/30 bg-[#b36a60]/10 p-6">
+          <div className="flex items-start gap-4">
+            <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-[#85483f]" />
+            <div>
+              <p className="eyebrow text-[#85483f]">Some metrics are unavailable</p>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-ink/55">{adminConnectionMessage(dashboardError)}</p>
+              <div className="mt-5"><RetryButton /></div>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map(({ label, value, icon: Icon }) => (
@@ -139,14 +143,17 @@ export default async function AdminDashboardPage() {
         )}
       </section>
 
-      {bookingsResult.status === "fulfilled" ? <BookingCalendar bookings={calendarBookings} /> : <section className="mt-10 border border-[#b36a60]/30 bg-[#b36a60]/10 p-7"><p className="eyebrow text-[#85483f]">Calendar unavailable</p><h2 className="mt-3 font-serif text-3xl">The booking calendar could not be loaded.</h2><p className="mt-3 text-sm text-ink/55">The overview metrics are available, but schedule data did not respond.</p><div className="mt-6"><RetryButton /></div></section>}
+      <BookingCalendar bookings={calendarBookings} />
+      {bookingsResult.status === "rejected" ? <section className="mt-4 border border-[#b36a60]/30 bg-[#b36a60]/10 p-5"><p className="eyebrow text-[#85483f]">Calendar data unavailable</p><p className="mt-2 text-sm text-ink/55">{adminConnectionMessage(bookingsResult.reason)} The calendar remains available without event data.</p></section> : null}
 
       <section className="mt-10 border border-ink/10 bg-paper">
         <div className="flex items-center justify-between border-b border-ink/10 px-6 py-5 sm:px-8">
           <div><p className="eyebrow">Studio calendar</p><h2 className="mt-2 font-serif text-3xl">Recent bookings</h2></div>
           <Link href="/admin/bookings" className="inline-flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.18em] hover:text-bronze">View all <ArrowRight className="h-3.5 w-3.5" /></Link>
         </div>
-        {bookings.length ? (
+        {bookingsResult.status === "rejected" ? (
+          <div className="px-8 py-10"><p className="text-sm text-ink/45">Recent bookings could not be loaded.</p><div className="mt-5"><RetryButton /></div></div>
+        ) : bookings.length ? (
           <div className="divide-y divide-ink/10">
             {bookings.map((booking) => <Link key={booking.id} href={`/admin/bookings/${booking.id}`} className="grid gap-3 px-6 py-5 transition hover:bg-bone/45 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-center sm:px-8"><div><p className="font-serif text-xl">{booking.customer_name}</p><p className="mt-1 text-xs text-ink/45">{booking.service ?? "Unspecified service"}</p></div><p className="text-xs text-ink/55">{formatDateTime(booking.date_time)}</p><StatusBadge status={booking.status} /><p className="text-[9px] uppercase tracking-[0.14em] text-ink/35">{formatDate(booking.created_at)}</p></Link>)}
           </div>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { AdminBackendError, createAdminBooking, getAdminBookings } from "@/lib/admin/backend";
+import { AdminBackendError, adminConnectionMessage, adminProxyStatus, createAdminBooking, getAdminBookings } from "@/lib/admin/backend";
 import { hasAdminSession } from "@/lib/admin/session";
 import type { BookingStatus } from "@/lib/admin/types";
 import { readJsonObject } from "@/lib/api/validation";
@@ -22,8 +22,15 @@ export async function POST(request: Request) {
   try {
     return NextResponse.json(await createAdminBooking(await readJsonObject(request) as Parameters<typeof createAdminBooking>[0]), { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    const status = error instanceof AdminBackendError ? error.status : 422;
-    return NextResponse.json({ message: status === 409 ? "Booking could not be created with these details." : "Booking details are invalid." }, { status, headers: { "Cache-Control": "no-store" } });
+    const status = error instanceof AdminBackendError
+      ? adminProxyStatus(error, [409, 422])
+      : 422;
+    const message = status === 503
+      ? adminConnectionMessage(error)
+      : status === 409
+        ? "Booking could not be created with these details."
+        : "Booking details are invalid.";
+    return NextResponse.json({ message }, { status, headers: { "Cache-Control": "no-store" } });
   }
 }
 
@@ -52,8 +59,8 @@ export async function GET(request: Request) {
   } catch (error) {
     if (error instanceof AdminBackendError) {
       return NextResponse.json(
-        { message: "Booking data is temporarily unavailable." },
-        { status: error.status === 401 ? 401 : 503, headers: { "Cache-Control": "no-store" } },
+        { message: adminConnectionMessage(error) },
+        { status: adminProxyStatus(error), headers: { "Cache-Control": "no-store" } },
       );
     }
     return NextResponse.json(

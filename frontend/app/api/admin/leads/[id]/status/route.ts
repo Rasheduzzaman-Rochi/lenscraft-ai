@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { AdminBackendError, updateAdminLeadStatus } from "@/lib/admin/backend";
+import { AdminBackendError, adminConnectionMessage, adminProxyStatus, updateAdminLeadStatus } from "@/lib/admin/backend";
 import { hasAdminSession } from "@/lib/admin/session";
 import { readJsonObject, requiredText } from "@/lib/api/validation";
 import type { AdminLeadStatus } from "@/lib/admin/types";
@@ -17,7 +17,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!statuses.has(status)) return NextResponse.json({ message: "Invalid lead status." }, { status: 422 });
     return NextResponse.json(await updateAdminLeadStatus((await context.params).id, status), { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    const status = error instanceof AdminBackendError ? error.status : 400;
-    return NextResponse.json({ message: status === 404 ? "Lead not found." : "Lead status could not be updated." }, { status, headers: { "Cache-Control": "no-store" } });
+    const status = error instanceof AdminBackendError
+      ? adminProxyStatus(error, [404, 422])
+      : 400;
+    const message = status === 404
+      ? "Lead not found."
+      : status === 503
+        ? adminConnectionMessage(error)
+        : "Lead status could not be updated.";
+    return NextResponse.json({ message }, { status, headers: { "Cache-Control": "no-store" } });
   }
 }

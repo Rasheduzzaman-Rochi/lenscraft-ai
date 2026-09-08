@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { AdminBackendError, getAdminBooking } from "@/lib/admin/backend";
+import { adminConnectionMessage, adminProxyStatus, getAdminBooking } from "@/lib/admin/backend";
 import { hasAdminSession } from "@/lib/admin/session";
 
 export const runtime = "nodejs";
@@ -17,9 +17,9 @@ export async function GET(
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    const status = error instanceof AdminBackendError ? error.status : 503;
+    const status = adminProxyStatus(error, [404]);
     return NextResponse.json(
-      { message: status === 404 ? "Booking not found." : "Booking data is temporarily unavailable." },
+      { message: status === 404 ? "Booking not found." : adminConnectionMessage(error) },
       { status, headers: { "Cache-Control": "no-store" } },
     );
   }

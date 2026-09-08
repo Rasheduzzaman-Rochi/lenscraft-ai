@@ -3,8 +3,7 @@ import Link from "next/link";
 
 import { BookingActions } from "@/components/admin/booking-actions";
 import { RetryButton } from "@/components/admin/retry-button";
-import { AdminBackendError } from "@/lib/admin/backend";
-import { getAdminBookings } from "@/lib/admin/backend";
+import { adminConnectionMessage, getAdminBookings } from "@/lib/admin/backend";
 import type { BookingStatus } from "@/lib/admin/types";
 import { cn } from "@/lib/utils";
 
@@ -78,7 +77,7 @@ export default async function AdminBookingsPage({
       </nav>
 
       {!data ? (
-        <div className="mt-6 border border-[#b36a60]/30 bg-[#b36a60]/10 p-7 text-sm text-[#85483f]"><p className="eyebrow">Data unavailable</p><h2 className="mt-3 font-serif text-3xl">Booking data is temporarily unavailable.</h2><p className="mt-3 max-w-xl leading-6 text-ink/55">{loadError instanceof AdminBackendError && loadError.detail === "Admin API configuration is incomplete." ? "The server admin connection needs ADMIN_API_KEY before booking data can load." : "The studio connection did not respond. Your bookings are safe; try the request again."}</p><div className="mt-6"><RetryButton /></div></div>
+        <div className="mt-6 border border-[#b36a60]/30 bg-[#b36a60]/10 p-7 text-sm text-[#85483f]"><p className="eyebrow">Data unavailable</p><h2 className="mt-3 font-serif text-3xl">Booking data is temporarily unavailable.</h2><p className="mt-3 max-w-xl leading-6 text-ink/55">{adminConnectionMessage(loadError)} Your bookings are safe.</p><div className="mt-6"><RetryButton /></div></div>
       ) : data.items.length ? (
         <>
           <div className="mt-6 hidden overflow-x-auto border border-ink/10 bg-paper xl:block">

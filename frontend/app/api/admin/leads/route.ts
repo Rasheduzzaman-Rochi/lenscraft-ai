@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { AdminBackendError, getAdminLeads } from "@/lib/admin/backend";
+import { adminConnectionMessage, adminProxyStatus, getAdminLeads } from "@/lib/admin/backend";
 import { hasAdminSession } from "@/lib/admin/session";
 
 export const runtime = "nodejs";
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const offset = Math.max(Number(search.get("offset") ?? 0), 0);
     return NextResponse.json(await getAdminLeads({ limit, offset }), { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    const status = error instanceof AdminBackendError ? error.status : 503;
-    return NextResponse.json({ message: "Lead data is temporarily unavailable." }, { status, headers: { "Cache-Control": "no-store" } });
+    const status = adminProxyStatus(error);
+    return NextResponse.json({ message: adminConnectionMessage(error) }, { status, headers: { "Cache-Control": "no-store" } });
   }
 }

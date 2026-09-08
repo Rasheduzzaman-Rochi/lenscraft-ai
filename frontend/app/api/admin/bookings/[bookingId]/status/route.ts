@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { AdminBackendError, updateAdminBookingStatus } from "@/lib/admin/backend";
+import { AdminBackendError, adminConnectionMessage, adminProxyStatus, updateAdminBookingStatus } from "@/lib/admin/backend";
 import { hasAdminSession } from "@/lib/admin/session";
 import type { BookingStatus } from "@/lib/admin/types";
 import { readJsonObject, requiredText } from "@/lib/api/validation";
@@ -40,12 +40,12 @@ export async function PATCH(
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof AdminBackendError) {
-      const status = error.status === 404 ? 404 : error.status === 409 ? 409 : error.status === 422 ? 422 : 503;
+      const status = adminProxyStatus(error, [404, 409, 422]);
       const message = status === 409
         ? "That time has already been confirmed for another booking."
         : status === 404 || status === 422
           ? "This booking can no longer be updated."
-          : "Booking management is temporarily unavailable.";
+          : adminConnectionMessage(error);
       return NextResponse.json({ message }, { status, headers: { "Cache-Control": "no-store" } });
     }
     return NextResponse.json(

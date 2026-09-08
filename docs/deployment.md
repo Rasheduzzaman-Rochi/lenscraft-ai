@@ -28,6 +28,7 @@ local runs and configure production values in Dokploy.
 | `SUPABASE_URL` | Required Supabase project HTTPS URL |
 | `SUPABASE_KEY` | Required server-only secret or legacy `service_role` key |
 | `AGENT_COMPANY_ID` | Required company UUID authorized for this agent deployment |
+| `ADMIN_API_KEY` | Required server-only key for Next.js-to-FastAPI admin requests; use the same value in both services |
 | `RETELL_API_KEY` | Required server-only key used to verify Retell signatures |
 | `ENVIRONMENT` | Set to `production`; Compose defaults to it |
 | `CORS_ORIGINS` | JSON array of exact HTTPS frontend origins, or `[]` when unused by browsers |
@@ -38,7 +39,7 @@ local runs and configure production values in Dokploy.
 | `OPENAI_API_KEY` | Reserved and may remain empty until an OpenAI integration exists |
 | `IMAGE_TAG` | Optional Compose image tag; defaults to `latest` |
 
-`SUPABASE_KEY`, `RETELL_API_KEY`, and future provider credentials are secrets.
+`SUPABASE_KEY`, `ADMIN_API_KEY`, `RETELL_API_KEY`, and future provider credentials are secrets.
 Store them as Dokploy service variables or through a supported secrets provider.
 Do not use Docker build arguments for runtime credentials.
 
@@ -110,6 +111,15 @@ labels. Dokploy also writes UI variables beside the Compose file, but those valu
 only reach a container when Compose maps them; the `environment` section performs
 that mapping explicitly. See Dokploy's [Docker Compose environment guide](https://docs.dokploy.com/docs/core/docker-compose)
 and [Compose domain guide](https://docs.dokploy.com/docs/core/docker-compose/domains).
+
+The Next.js admin bridge and FastAPI backend must receive the same non-empty
+`ADMIN_API_KEY`. The key belongs in each service's runtime environment and must
+not be exposed through a `NEXT_PUBLIC_` variable. After deployment, the first
+admin request logs only these boolean frontend checks:
+`hasApiUrl`, `hasAdminApiKey`, and `hasCompanyId`. If FastAPI logs
+`Admin API authentication is not configured`, verify that the Compose
+`environment` mapping is present and redeploy the backend container; changing
+the Dokploy UI variable alone does not update an already-running container.
 
 Uvicorn trusts forwarded headers because the container is intended to receive
 traffic through Dokploy's Traefik network. Do not publish port `8000` directly on

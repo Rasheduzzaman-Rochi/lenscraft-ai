@@ -12,10 +12,10 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-Copy `.env.example` to `.env.local` and configure the FastAPI origin, the
-server-only Retell signing key, and the fixed company UUID. Only
-`NEXT_PUBLIC_API_URL` is public; never add `NEXT_PUBLIC_` to either secret-side
-setting.
+Copy `.env.example` to `.env.local` and configure the Supabase public Auth
+values, FastAPI origin, server-only admin API key, and fixed company UUID.
+`ADMIN_API_KEY` must match the backend deployment and must never use a
+`NEXT_PUBLIC_` prefix.
 
 ## Production build
 
@@ -24,6 +24,14 @@ npm run build
 npm run start
 ```
 
+For Dokploy, configure `NEXT_PUBLIC_SUPABASE_URL` and
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` for the browser build. Configure
+`NEXT_PUBLIC_API_URL`, `ADMIN_API_KEY`, and `LENSCRAFT_COMPANY_ID` on the
+running Next.js service. Admin server code reads the API URL dynamically at
+runtime; the API key and company UUID are never bundled into client JavaScript.
+The backend service must receive the same `ADMIN_API_KEY` and must map it into
+its container environment.
+
 ## Routes
 
 - `/` — studio landing page
@@ -31,6 +39,9 @@ npm run start
 - `/portfolio` — filterable portfolio gallery
 - `/contact` — project enquiry form foundation
 - `/booking` — booking request form foundation
+- `/admin` — authenticated studio overview
+- `/admin/bookings` — authenticated booking operations
+- `/admin/leads` — authenticated lead operations
 
 The current visual placeholders are CSS-generated and have no external image
 dependency. Replace them with optimized `next/image` assets when approved studio

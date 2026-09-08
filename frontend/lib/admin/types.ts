@@ -47,14 +47,14 @@ export type AdminLeadList = {
 };
 
 export type AdminDashboard = {
-  bookings?: {
+  bookings: {
     total: number;
     pending: number;
     confirmed: number;
     rejected?: number;
     cancelled?: number;
   };
-  leads?: {
+  leads: {
     total?: number;
     new?: number;
     converted?: number;
@@ -65,5 +65,5 @@ export type AdminDashboard = {
   conversion_rate?: number;
   total_leads?: number;
   converted_leads?: number;
-  recent_leads?: AdminLead[];
+  recent_leads: AdminLead[];
 };
