@@ -4,6 +4,8 @@ import { CalendarCheck, CheckCircle2, Clock3, ContactRound, Images } from "lucid
 import { BookingForm } from "@/components/booking-form";
 import { PageHero } from "@/components/page-hero";
 import { Reveal } from "@/components/reveal";
+import { StudioImage } from "@/components/studio-image";
+import { images } from "@/lib/images";
 
 export const metadata: Metadata = {
   title: "Request a Booking",
@@ -45,6 +47,14 @@ export default function BookingPage() {
                   </div>
                 ))}
               </div>
+              <StudioImage
+                src={images.booking.consultation}
+                title="LensCraft studio consultation"
+                orientation="landscape"
+                minimal
+                className="mt-9 hidden lg:block"
+                sizes="28vw"
+              />
             </aside>
           </Reveal>
           <Reveal delay={0.1}>

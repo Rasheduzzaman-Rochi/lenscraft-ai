@@ -7,10 +7,9 @@ import { useState } from "react";
 import type { BookingStatus } from "@/lib/admin/types";
 import { cn } from "@/lib/utils";
 
-const actions: Array<{ status: Exclude<BookingStatus, "pending">; label: string; className: string }> = [
+const actions: Array<{ status: Exclude<BookingStatus, "pending" | "cancelled">; label: string; className: string }> = [
   { status: "confirmed", label: "Confirm", className: "bg-ink text-paper hover:bg-bronze" },
   { status: "rejected", label: "Reject", className: "border border-ink/15 hover:border-[#8d433b] hover:text-[#8d433b]" },
-  { status: "cancelled", label: "Cancel", className: "border border-ink/15 text-ink/50 hover:border-ink/45 hover:text-ink" },
 ];
 
 export function BookingActions({ bookingId }: { bookingId: string }) {
@@ -18,16 +17,16 @@ export function BookingActions({ bookingId }: { bookingId: string }) {
   const [busy, setBusy] = useState<BookingStatus | null>(null);
   const [message, setMessage] = useState<string>();
 
-  async function update(status: Exclude<BookingStatus, "pending">) {
+  async function update(status: Exclude<BookingStatus, "pending" | "cancelled">) {
     const accepted = window.confirm(`Mark this booking as ${status}? This action cannot be reversed here.`);
     if (!accepted) return;
     setBusy(status);
     setMessage(undefined);
     try {
-      const response = await fetch(`/api/admin/bookings/${bookingId}/status`, {
+      const response = await fetch("/api/admin/bookings/status", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ booking_id: bookingId, status }),
       });
       const result = await response.json().catch(() => null) as { message?: unknown } | null;
       if (!response.ok) {

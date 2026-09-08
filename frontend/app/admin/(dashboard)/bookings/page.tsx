@@ -81,14 +81,15 @@ export default async function AdminBookingsPage({
             <table className="w-full min-w-[1100px] border-collapse text-left">
               <thead>
                 <tr className="border-b border-ink/10 text-[8px] font-semibold uppercase tracking-[0.18em] text-ink/40">
-                  <th className="px-5 py-4">Customer</th><th className="px-5 py-4">Contact</th><th className="px-5 py-4">Service</th><th className="px-5 py-4">Appointment</th><th className="px-5 py-4">Status</th><th className="px-5 py-4">Notes</th><th className="px-5 py-4">Actions</th>
+                  <th className="px-5 py-4">Customer</th><th className="px-5 py-4">Email</th><th className="px-5 py-4">Phone</th><th className="px-5 py-4">Service</th><th className="px-5 py-4">Date/time</th><th className="px-5 py-4">Status</th><th className="px-5 py-4">Notes</th><th className="px-5 py-4">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink/10">
                 {data.items.map((booking) => (
                   <tr key={booking.id} className="align-top transition hover:bg-bone/55">
                     <td className="px-5 py-5 font-serif text-lg">{booking.customer_name}</td>
-                    <td className="px-5 py-5 text-xs leading-5 text-ink/55"><span className="block">{booking.email ?? "—"}</span><span className="block">{booking.phone ?? "—"}</span></td>
+                    <td className="px-5 py-5 text-xs text-ink/55">{booking.email ?? "—"}</td>
+                    <td className="whitespace-nowrap px-5 py-5 text-xs text-ink/55">{booking.phone ?? "—"}</td>
                     <td className="px-5 py-5 text-sm text-ink/65">{booking.service ?? "Unspecified"}</td>
                     <td className="whitespace-nowrap px-5 py-5 text-xs text-ink/55">{formatDateTime(booking.date_time)}</td>
                     <td className="px-5 py-5"><StatusBadge status={booking.status} /></td>

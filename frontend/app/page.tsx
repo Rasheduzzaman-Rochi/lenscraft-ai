@@ -5,9 +5,10 @@ import { Reveal } from "@/components/reveal";
 import { SectionHeading } from "@/components/section-heading";
 import { ServiceCard } from "@/components/service-card";
 import { Button } from "@/components/ui/button";
-import { VisualPlaceholder } from "@/components/visual-placeholder";
+import { StudioImage } from "@/components/studio-image";
 import { VoiceAssistantTrigger } from "@/components/voice-assistant";
 import { portfolioItems, processSteps, services } from "@/lib/data";
+import { images } from "@/lib/images";
 
 const reasons = [
   { icon: ScanLine, title: "Detail, directed", text: "Every surface, silhouette, and shadow is shaped with commercial purpose." },
@@ -42,7 +43,7 @@ export default function HomePage() {
           </div>
 
           <Reveal delay={0.18} className="relative mx-auto w-full max-w-xl lg:mx-0 lg:max-w-none">
-            <VisualPlaceholder title="Campaign Study" category="Featured work" tone="noir" className="aspect-[4/5] shadow-soft" />
+            <StudioImage src={images.hero.main} title="Campaign Study" category="Featured work" priority className="aspect-[4/5] shadow-soft" sizes="(min-width: 1024px) 42vw, 90vw" />
             <div className="absolute -left-5 top-1/2 hidden w-32 -translate-y-1/2 bg-paper p-4 shadow-soft sm:block">
               <p className="font-serif text-3xl">01</p>
               <p className="mt-2 text-[8px] uppercase leading-4 tracking-[0.2em] text-ink/45">Light<br />Form<br />Feeling</p>
@@ -66,9 +67,9 @@ export default function HomePage() {
             <p className="hidden max-w-xs text-right text-xs leading-5 text-paper/45 md:block">Light, material, colour, and movement composed into images with commercial purpose.</p>
           </Reveal>
           <div className="mt-12 grid grid-cols-12 items-end gap-3 sm:gap-5">
-            <Reveal className="col-span-7 sm:col-span-5"><VisualPlaceholder {...portfolioItems[7]} className="aspect-[4/5]" /></Reveal>
-            <Reveal delay={0.1} className="col-span-5 sm:col-span-3"><VisualPlaceholder {...portfolioItems[2]} className="aspect-[3/4]" /></Reveal>
-            <Reveal delay={0.18} className="col-span-8 col-start-3 mt-6 sm:col-span-4 sm:col-start-auto sm:mt-0"><VisualPlaceholder {...portfolioItems[10]} className="aspect-[5/4]" /></Reveal>
+            <Reveal className="col-span-7 sm:col-span-5"><StudioImage src={portfolioItems[7].image} {...portfolioItems[7]} className="aspect-[4/5]" /></Reveal>
+            <Reveal delay={0.1} className="col-span-5 sm:col-span-3"><StudioImage src={portfolioItems[2].image} {...portfolioItems[2]} className="aspect-[3/4]" /></Reveal>
+            <Reveal delay={0.18} className="col-span-8 col-start-3 mt-6 sm:col-span-4 sm:col-start-auto sm:mt-0"><StudioImage src={portfolioItems[10].image} {...portfolioItems[10]} className="aspect-[5/4]" /></Reveal>
           </div>
         </div>
       </section>
@@ -98,9 +99,9 @@ export default function HomePage() {
         <div className="page-shell">
           <Reveal><SectionHeading eyebrow="Selected frames" title="A study in material, mood, and movement." light /></Reveal>
           <div className="mt-16 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-12 lg:items-end">
-            <Reveal className="col-span-2 lg:col-span-5"><VisualPlaceholder {...portfolioItems[0]} className="aspect-[4/5]" /></Reveal>
-            <Reveal delay={0.08} className="col-span-1 lg:col-span-3"><VisualPlaceholder {...portfolioItems[2]} className="aspect-[4/5]" /></Reveal>
-            <Reveal delay={0.16} className="col-span-1 lg:col-span-4"><VisualPlaceholder {...portfolioItems[5]} className="aspect-[4/5] lg:aspect-square" /></Reveal>
+            <Reveal className="col-span-2 lg:col-span-5"><StudioImage src={portfolioItems[0].image} {...portfolioItems[0]} className="aspect-[4/5]" /></Reveal>
+            <Reveal delay={0.08} className="col-span-1 lg:col-span-3"><StudioImage src={portfolioItems[2].image} {...portfolioItems[2]} className="aspect-[4/5]" /></Reveal>
+            <Reveal delay={0.16} className="col-span-1 lg:col-span-4"><StudioImage src={portfolioItems[5].image} {...portfolioItems[5]} className="aspect-[4/5] lg:aspect-square" /></Reveal>
           </div>
           <div className="mt-10 flex justify-end">
             <Button asChild variant="light"><Link href="/portfolio">View the portfolio <ArrowRight className="h-4 w-4" /></Link></Button>
@@ -154,7 +155,7 @@ export default function HomePage() {
             <div className="mt-9 flex flex-wrap items-center gap-4"><VoiceAssistantTrigger className="shadow-[0_16px_35px_rgba(23,22,18,0.14)]">Talk with LensCraft AI <Mic className="h-4 w-4" /></VoiceAssistantTrigger><span className="text-[9px] uppercase tracking-[0.16em] text-ink/40">No waiting · Speak naturally</span></div>
           </Reveal>
           <Reveal delay={0.12} className="relative min-h-[420px] lg:min-h-[620px]">
-            <VisualPlaceholder title="The Studio Line" category="AI assisted" tone="bronze" className="absolute inset-0 aspect-auto h-full w-full" />
+            <StudioImage src={images.hero.assistant} title="The Studio Line" category="AI assisted" className="absolute inset-0 aspect-auto h-full w-full" sizes="(min-width: 1024px) 50vw, 100vw" />
           </Reveal>
         </div>
       </section>

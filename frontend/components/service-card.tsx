@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 
 import type { Service } from "@/lib/data";
-import { VisualPlaceholder } from "@/components/visual-placeholder";
+import { StudioImage } from "@/components/studio-image";
 
 export function ServiceCard({ service, featured = false }: { service: Service; featured?: boolean }) {
   return (
@@ -12,9 +12,9 @@ export function ServiceCard({ service, featured = false }: { service: Service; f
         <span>LensCraft service</span>
       </div>
       {featured ? (
-        <VisualPlaceholder
+        <StudioImage
+          src={service.image}
           title={service.name}
-          tone={service.tone}
           orientation="landscape"
           minimal
           className="mb-7 overflow-hidden transition duration-700 ease-out group-hover:scale-[1.018] group-hover:brightness-105"

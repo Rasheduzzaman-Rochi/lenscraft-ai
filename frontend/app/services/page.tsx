@@ -5,7 +5,7 @@ import Link from "next/link";
 import { PageHero } from "@/components/page-hero";
 import { Reveal } from "@/components/reveal";
 import { Button } from "@/components/ui/button";
-import { VisualPlaceholder } from "@/components/visual-placeholder";
+import { StudioImage } from "@/components/studio-image";
 import { VoiceAssistantTrigger } from "@/components/voice-assistant";
 import { services } from "@/lib/data";
 import { cn } from "@/lib/utils";
@@ -33,10 +33,10 @@ export default function ServicesPage() {
               className="scroll-mt-32 grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-20"
             >
               <Reveal className={cn(index % 2 === 1 && "lg:order-2")}>
-                <VisualPlaceholder
+                <StudioImage
+                  src={service.image}
                   title={service.name}
                   category={service.number}
-                  tone={service.tone}
                   orientation={index % 3 === 0 ? "landscape" : "portrait"}
                   className="max-h-[680px] w-full"
                 />
