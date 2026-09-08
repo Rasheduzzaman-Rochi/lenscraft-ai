@@ -1,0 +1,1 @@
+export const ADMIN_BOOKINGS_PAGE_SIZE = 25;
