@@ -1,4 +1,5 @@
 const bucketName = "lenscraft-media";
+const objectRoot = "lenscraft-media";
 const configuredUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
 
 if (!configuredUrl) {
@@ -12,46 +13,46 @@ if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
 const supabaseUrl = parsedUrl.toString().replace(/\/+$/, "");
 
 function publicImage(objectPath: string) {
-  const encodedPath = objectPath.split("/").map(encodeURIComponent).join("/");
+  const encodedPath = `${objectRoot}/${objectPath}`.split("/").map(encodeURIComponent).join("/");
   return `${supabaseUrl}/storage/v1/object/public/${bucketName}/${encodedPath}`;
 }
 
 export const images = {
   hero: {
-    main: publicImage("hero/campaign-study.webp"),
-    assistant: publicImage("hero/studio-line.webp"),
+    main: publicImage("hero/studio-main.jpg"),
+    assistant: publicImage("hero/studio-main.jpg"),
   },
   portfolio: {
     fashion: [
-      publicImage("portfolio/fashion/after-hours.webp"),
-      publicImage("portfolio/fashion/the-essential-shirt.webp"),
-      publicImage("portfolio/fashion/new-classic.webp"),
+      publicImage("portfolio/fashion/fashion-1.jpg"),
+      publicImage("portfolio/fashion/fashion-2.jpg"),
+      publicImage("portfolio/fashion/fashion-1.jpg"),
     ],
     product: [
-      publicImage("portfolio/product/form-no-01.webp"),
-      publicImage("portfolio/product/soft-geometry.webp"),
-      publicImage("portfolio/product/quiet-utility.webp"),
-      publicImage("portfolio/product/object-and-shadow.webp"),
+      publicImage("portfolio/product/product-1.jpg"),
+      publicImage("portfolio/product/product-2.jpg"),
+      publicImage("portfolio/product/product-1.jpg"),
+      publicImage("portfolio/product/product-2.jpg"),
     ],
     jewellery: [
-      publicImage("portfolio/jewellery/fine-objects.webp"),
-      publicImage("portfolio/jewellery/brilliance-study.webp"),
-      publicImage("portfolio/jewellery/precious-light.webp"),
+      publicImage("portfolio/jewellery/jewellery-1.jpg"),
+      publicImage("portfolio/jewellery/jewellery-2.jpg"),
+      publicImage("portfolio/jewellery/jewellery-1.jpg"),
     ],
     lifestyle: [
-      publicImage("portfolio/lifestyle/sunday-light.webp"),
-      publicImage("portfolio/lifestyle/golden-hour.webp"),
+      publicImage("portfolio/lifestyle/lifestyle-1.jpg"),
+      publicImage("portfolio/lifestyle/lifestyle-2.jpg"),
     ],
   },
   services: {
-    productPhotography: publicImage("services/product-photography.webp"),
-    fashionPhotography: publicImage("services/fashion-photography.webp"),
-    ghostMannequinPhotography: publicImage("services/ghost-mannequin-photography.webp"),
-    flatLayPhotography: publicImage("services/flat-lay-photography.webp"),
-    jewelleryPhotography: publicImage("services/jewellery-photography.webp"),
-    lifestylePhotography: publicImage("services/lifestyle-photography.webp"),
+    productPhotography: publicImage("services/product.jpg"),
+    fashionPhotography: publicImage("services/fashion.jpg"),
+    ghostMannequinPhotography: publicImage("services/ghost-mannequin.jpg"),
+    flatLayPhotography: publicImage("services/flatlay.jpg"),
+    jewelleryPhotography: publicImage("services/jewellery.jpg"),
+    lifestylePhotography: publicImage("services/lifestyle.jpg"),
   },
   booking: {
-    consultation: publicImage("booking/studio-consultation.webp"),
+    consultation: publicImage("booking/booking.jpg"),
   },
 } as const;
