@@ -1,11 +1,11 @@
 import "server-only";
 
-import type { AdminBookingList, AdminDashboard, BookingStatus } from "@/lib/admin/types";
+import type { AdminBooking, AdminBookingList, AdminDashboard, AdminLead, AdminLeadList, BookingStatus } from "@/lib/admin/types";
 
 const REQUEST_TIMEOUT_MS = 12_000;
 
 export class AdminBackendError extends Error {
-  constructor(public readonly status: number) {
+  constructor(public readonly status: number, public readonly detail?: string) {
     super("Admin backend request failed");
     this.name = "AdminBackendError";
   }
@@ -16,9 +16,16 @@ function configuration() {
   const apiKey = process.env.ADMIN_API_KEY?.trim();
   const companyId = process.env.LENSCRAFT_COMPANY_ID?.trim();
 
-  if (!rawUrl || !apiKey || !companyId) throw new AdminBackendError(503);
+  if (!rawUrl || !apiKey || !companyId) {
+    console.warn("[admin-backend] incomplete configuration", {
+      hasApiUrl: Boolean(rawUrl),
+      hasAdminApiKey: Boolean(apiKey),
+      hasCompanyId: Boolean(companyId),
+    });
+    throw new AdminBackendError(503, "Admin API configuration is incomplete.");
+  }
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(companyId)) {
-    throw new AdminBackendError(503);
+    throw new AdminBackendError(503, "Admin API configuration is invalid.");
   }
 
   try {
@@ -26,7 +33,8 @@ function configuration() {
     if (!['http:', 'https:'].includes(url.protocol)) throw new Error();
     return { apiUrl: url.toString().replace(/\/$/, ""), apiKey, companyId };
   } catch {
-    throw new AdminBackendError(503);
+    console.warn("[admin-backend] invalid API URL configuration");
+    throw new AdminBackendError(503, "Admin API is unavailable.");
   }
 }
 
@@ -45,11 +53,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   } catch {
+    console.warn("[admin-backend] request failed", { path });
     throw new AdminBackendError(503);
   }
 
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new AdminBackendError(response.status);
+  if (!response.ok) {
+    const detail = payload && typeof payload === "object" && "detail" in payload && typeof payload.detail === "string"
+      ? payload.detail
+      : payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string"
+        ? payload.message
+        : undefined;
+    console.warn("[admin-backend] upstream request rejected", {
+      path,
+      status: response.status,
+      detail,
+    });
+    throw new AdminBackendError(response.status, detail);
+  }
   return payload as T;
 }
 
@@ -76,4 +97,20 @@ export function updateAdminBookingStatus(bookingId: string, status: Exclude<Book
       body: JSON.stringify({ company_id: companyId, status }),
     },
   );
+}
+
+export function getAdminBooking(bookingId: string) {
+  return request<AdminBooking>(`/api/v1/admin/bookings/${encodeURIComponent(bookingId)}`);
+}
+
+export function getAdminLeads(options: { limit?: number; offset?: number } = {}) {
+  const query = new URLSearchParams({
+    limit: String(options.limit ?? 50),
+    offset: String(options.offset ?? 0),
+  });
+  return request<AdminLeadList>(`/api/v1/admin/leads?${query}`);
+}
+
+export function getAdminLead(leadId: string) {
+  return request<AdminLead>(`/api/v1/admin/leads/${encodeURIComponent(leadId)}`);
 }

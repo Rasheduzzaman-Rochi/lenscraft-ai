@@ -41,7 +41,16 @@ export function SiteFooter() {
         </div>
         <div className="flex flex-col gap-3 pt-6 text-[9px] uppercase tracking-[0.18em] text-paper/35 sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} LensCraft Studio</p>
-          <p>Photography, considered.</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <p>Photography, considered.</p>
+            <span className="hidden h-3 w-px bg-paper/15 sm:block" aria-hidden="true" />
+            <Link
+              href="/admin/login"
+              className="text-paper/30 transition hover:text-paper/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-clay focus-visible:ring-offset-4 focus-visible:ring-offset-ink"
+            >
+              Admin Portal
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

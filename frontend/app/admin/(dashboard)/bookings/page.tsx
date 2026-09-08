@@ -2,6 +2,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 import { BookingActions } from "@/components/admin/booking-actions";
+import { RetryButton } from "@/components/admin/retry-button";
+import { AdminBackendError } from "@/lib/admin/backend";
 import { getAdminBookings } from "@/lib/admin/backend";
 import type { BookingStatus } from "@/lib/admin/types";
 import { cn } from "@/lib/utils";
@@ -44,11 +46,13 @@ export default async function AdminBookingsPage({
   const selected = statusOptions.some((option) => option.value === query.status) ? query.status! : "all";
   const parsedPage = Number.parseInt(query.page ?? "1", 10);
   const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
-  const data = await getAdminBookings({
+  const result = await getAdminBookings({
     status: selected === "all" ? undefined : selected as BookingStatus,
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
-  }).catch(() => null);
+  }).then((value) => ({ value })).catch((error) => ({ error }));
+  const data = "value" in result ? result.value : null;
+  const loadError = "error" in result ? result.error : null;
 
   return (
     <div className="mx-auto max-w-[1500px]">
@@ -74,14 +78,14 @@ export default async function AdminBookingsPage({
       </nav>
 
       {!data ? (
-        <div className="mt-6 border border-[#b36a60]/30 bg-[#b36a60]/10 p-7 text-sm text-[#85483f]">Booking data is temporarily unavailable.</div>
+        <div className="mt-6 border border-[#b36a60]/30 bg-[#b36a60]/10 p-7 text-sm text-[#85483f]"><p className="eyebrow">Data unavailable</p><h2 className="mt-3 font-serif text-3xl">Booking data is temporarily unavailable.</h2><p className="mt-3 max-w-xl leading-6 text-ink/55">{loadError instanceof AdminBackendError && loadError.detail === "Admin API configuration is incomplete." ? "The server admin connection needs ADMIN_API_KEY before booking data can load." : "The studio connection did not respond. Your bookings are safe; try the request again."}</p><div className="mt-6"><RetryButton /></div></div>
       ) : data.items.length ? (
         <>
           <div className="mt-6 hidden overflow-x-auto border border-ink/10 bg-paper xl:block">
             <table className="w-full min-w-[1100px] border-collapse text-left">
               <thead>
                 <tr className="border-b border-ink/10 text-[8px] font-semibold uppercase tracking-[0.18em] text-ink/40">
-                  <th className="px-5 py-4">Customer</th><th className="px-5 py-4">Email</th><th className="px-5 py-4">Phone</th><th className="px-5 py-4">Service</th><th className="px-5 py-4">Date/time</th><th className="px-5 py-4">Status</th><th className="px-5 py-4">Notes</th><th className="px-5 py-4">Actions</th>
+                  <th className="px-5 py-4">Customer</th><th className="px-5 py-4">Contact</th><th className="px-5 py-4">Service</th><th className="px-5 py-4">Date/time</th><th className="px-5 py-4">Status</th><th className="px-5 py-4">Created</th><th className="px-5 py-4">Notes</th><th className="px-5 py-4">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink/10">
@@ -93,8 +97,9 @@ export default async function AdminBookingsPage({
                     <td className="px-5 py-5 text-sm text-ink/65">{booking.service ?? "Unspecified"}</td>
                     <td className="whitespace-nowrap px-5 py-5 text-xs text-ink/55">{formatDateTime(booking.date_time)}</td>
                     <td className="px-5 py-5"><StatusBadge status={booking.status} /></td>
+                    <td className="whitespace-nowrap px-5 py-5 text-xs text-ink/45">{formatDateTime(booking.created_at)}</td>
                     <td className="max-w-[220px] px-5 py-5 text-xs leading-5 text-ink/50">{booking.notes ?? "—"}</td>
-                    <td className="px-5 py-5">{booking.status === "pending" ? <BookingActions bookingId={booking.id} /> : <span className="text-[8px] uppercase tracking-[0.15em] text-ink/30">Completed</span>}</td>
+                    <td className="px-5 py-5"><Link href={`/admin/bookings/${booking.id}`} className="text-[8px] font-semibold uppercase tracking-[0.15em] text-bronze hover:text-ink">View details</Link>{booking.status === "pending" ? <div className="mt-3"><BookingActions bookingId={booking.id} /></div> : null}</td>
                   </tr>
                 ))}
               </tbody>
@@ -110,7 +115,7 @@ export default async function AdminBookingsPage({
                   <div><dt className="eyebrow">Appointment</dt><dd className="mt-2 text-sm">{formatDateTime(booking.date_time)}</dd></div>
                   <div className="sm:col-span-2"><dt className="eyebrow">Notes</dt><dd className="mt-2 text-sm leading-6 text-ink/55">{booking.notes ?? "No notes supplied."}</dd></div>
                 </dl>
-                {booking.status === "pending" ? <div className="mt-5"><BookingActions bookingId={booking.id} /></div> : null}
+                <div className="mt-5 flex items-center justify-between gap-4"><Link href={`/admin/bookings/${booking.id}`} className="text-[9px] font-semibold uppercase tracking-[0.15em] text-bronze">View details</Link>{booking.status === "pending" ? <BookingActions bookingId={booking.id} /> : null}</div>
               </article>
             ))}
           </div>

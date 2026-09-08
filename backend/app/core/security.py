@@ -2,6 +2,7 @@
 
 import hashlib
 import hmac
+import logging
 import re
 import time
 from typing import Annotated
@@ -11,6 +12,7 @@ from fastapi.security import APIKeyHeader
 
 _RETELL_SIGNATURE_PATTERN = re.compile(r"^v=(\d+),d=([0-9a-fA-F]{64})$")
 _ADMIN_API_KEY_HEADER = APIKeyHeader(name="X-Admin-API-Key", auto_error=False)
+logger = logging.getLogger(__name__)
 
 
 def require_admin_auth(
@@ -20,6 +22,7 @@ def require_admin_auth(
     """Require the configured server-side key for an internal API request."""
     configured_key = request.app.state.settings.admin_api_key.get_secret_value().strip()
     if not configured_key:
+        logger.warning("Admin API authentication is not configured")
         raise HTTPException(503, "Admin API authentication is not configured.")
 
     candidate = supplied_key or ""

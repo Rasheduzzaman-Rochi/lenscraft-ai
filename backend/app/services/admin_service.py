@@ -11,6 +11,7 @@ from app.schemas.admin import (
     AdminBookingStats,
     AdminDashboard,
     AdminLead,
+    AdminLeadList,
 )
 from app.schemas.booking import BookingStatus
 
@@ -60,3 +61,33 @@ class AdminService:
             )
         except ValidationError:
             raise AdminDataError("Stored dashboard data is invalid") from None
+
+    async def get_booking(self, booking_id: UUID) -> AdminBooking:
+        row = await self.repository.get_booking(booking_id)
+        if row is None:
+            raise KeyError("booking not found")
+        try:
+            return AdminBooking.model_validate(row)
+        except ValidationError:
+            raise AdminDataError("Stored booking data is invalid") from None
+
+    async def list_leads(self, *, limit: int, offset: int) -> AdminLeadList:
+        rows, total = await self.repository.list_leads(limit=limit, offset=offset)
+        try:
+            return AdminLeadList(
+                items=[AdminLead.model_validate(row) for row in rows],
+                total=total,
+                limit=limit,
+                offset=offset,
+            )
+        except ValidationError:
+            raise AdminDataError("Stored lead data is invalid") from None
+
+    async def get_lead(self, lead_id: UUID) -> AdminLead:
+        row = await self.repository.get_lead(lead_id)
+        if row is None:
+            raise KeyError("lead not found")
+        try:
+            return AdminLead.model_validate(row)
+        except ValidationError:
+            raise AdminDataError("Stored lead data is invalid") from None

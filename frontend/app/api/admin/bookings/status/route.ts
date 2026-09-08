@@ -8,9 +8,10 @@ import { readJsonObject, requiredText } from "@/lib/api/validation";
 export const runtime = "nodejs";
 
 const BOOKING_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const allowedStatuses = new Set<Exclude<BookingStatus, "pending" | "cancelled">>([
+const allowedStatuses = new Set<Exclude<BookingStatus, "pending">>([
   "confirmed",
   "rejected",
+  "cancelled",
 ]);
 
 function isSameOrigin(request: Request) {

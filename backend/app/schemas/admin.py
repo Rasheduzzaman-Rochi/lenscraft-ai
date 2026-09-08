@@ -20,6 +20,8 @@ class AdminBooking(BaseModel):
     status: BookingStatus
     notes: str | None = Field(default=None, max_length=5_000)
     created_at: AwareDatetime
+    business_name: str | None = Field(default=None, max_length=500)
+    industry: str | None = Field(default=None, max_length=200)
 
 
 class AdminBookingList(BaseModel):
@@ -41,12 +43,24 @@ class AdminLead(BaseModel):
     intent: str | None = Field(default=None, max_length=1_000)
     estimated_value: Decimal | None = Field(default=None, ge=0)
     created_at: AwareDatetime
+    phone: str | None = Field(default=None, max_length=50)
+    service: str | None = Field(default=None, max_length=500)
+    project_details: dict[str, object] = Field(default_factory=dict)
+
+
+class AdminLeadList(BaseModel):
+    items: list[AdminLead]
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1, le=100)
+    offset: int = Field(ge=0)
 
 
 class AdminBookingStats(BaseModel):
     total: int = Field(ge=0)
     pending: int = Field(ge=0)
     confirmed: int = Field(ge=0)
+    rejected: int = Field(default=0, ge=0)
+    cancelled: int = Field(default=0, ge=0)
 
 
 class AdminDashboard(BaseModel):

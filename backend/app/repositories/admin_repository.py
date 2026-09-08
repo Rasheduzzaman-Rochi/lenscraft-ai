@@ -60,7 +60,7 @@ class AdminRepository(BaseRepository):
             if customer_ids:
                 customers = self._rows(
                     client.table("customers")
-                    .select("id,name,email,phone")
+                    .select("id,name,email,phone,business_name,industry")
                     .eq("company_id", self.company_id)
                     .in_("id", customer_ids)
                     .limit(100)
@@ -81,8 +81,50 @@ class AdminRepository(BaseRepository):
                     "status": booking.get("status"),
                     "notes": booking.get("notes"),
                     "created_at": booking.get("created_at"),
+                    "business_name": customer.get("business_name"),
+                    "industry": customer.get("industry"),
                 })
             return results, total
+
+        return await self._run(execute)
+
+    async def get_booking(self, booking_id: UUID) -> Record | None:
+        """Return one tenant booking with its complete customer details."""
+        booking_id = str(booking_id)
+
+        def execute(client) -> Record | None:
+            booking = self._one(
+                client.table("bookings")
+                .select("id,customer_id,service_type,date_time,status,notes,created_at")
+                .eq("company_id", self.company_id)
+                .eq("id", booking_id)
+                .limit(1)
+                .execute(),
+            )
+            if booking is None:
+                return None
+            customer = self._one(
+                client.table("customers")
+                .select("id,name,email,phone,business_name,industry")
+                .eq("company_id", self.company_id)
+                .eq("id", booking["customer_id"])
+                .limit(1)
+                .execute(),
+                required=True,
+            )
+            return {
+                "id": booking.get("id"),
+                "customer_name": customer.get("name"),
+                "email": customer.get("email"),
+                "phone": customer.get("phone"),
+                "business_name": customer.get("business_name"),
+                "industry": customer.get("industry"),
+                "service": booking.get("service_type"),
+                "date_time": booking.get("date_time"),
+                "status": booking.get("status"),
+                "notes": booking.get("notes"),
+                "created_at": booking.get("created_at"),
+            }
 
         return await self._run(execute)
 
@@ -104,6 +146,8 @@ class AdminRepository(BaseRepository):
                 "total": count(),
                 "pending": count(BookingStatus.PENDING),
                 "confirmed": count(BookingStatus.CONFIRMED),
+                "rejected": count(BookingStatus.REJECTED),
+                "cancelled": count(BookingStatus.CANCELLED),
             }
 
         return await self._run(execute)
@@ -131,7 +175,7 @@ class AdminRepository(BaseRepository):
             if customer_ids:
                 customers = self._rows(
                     client.table("customers")
-                    .select("id,name,email")
+                    .select("id,name,email,phone")
                     .eq("company_id", self.company_id)
                     .in_("id", customer_ids)
                     .limit(100)
@@ -148,6 +192,9 @@ class AdminRepository(BaseRepository):
                     "email": customer_by_id.get(
                         str(lead.get("customer_id")), {}
                     ).get("email"),
+                    "phone": customer_by_id.get(
+                        str(lead.get("customer_id")), {}
+                    ).get("phone"),
                     "status": lead.get("status"),
                     "intent": lead.get("intent"),
                     "estimated_value": lead.get("estimated_value"),
@@ -155,5 +202,115 @@ class AdminRepository(BaseRepository):
                 }
                 for lead in leads
             ]
+
+        return await self._run(execute)
+
+    async def list_leads(self, *, limit: int = 50, offset: int = 0) -> tuple[list[Record], int]:
+        """Return bounded tenant-scoped leads with customer and project details."""
+        first, last = pagination(limit, offset)
+
+        def execute(client) -> tuple[list[Record], int]:
+            response = (
+                client.table("leads")
+                .select("id,customer_id,status,source,intent,estimated_value,created_at", count="exact")
+                .eq("company_id", self.company_id)
+                .order("created_at", desc=True)
+                .range(first, last)
+                .execute()
+            )
+            leads = self._rows(response)
+            total = self._exact_count(response)
+            customer_ids = sorted({str(row["customer_id"]) for row in leads if row.get("customer_id")})
+            customers = self._rows(
+                client.table("customers")
+                .select("id,name,email,phone")
+                .eq("company_id", self.company_id)
+                .in_("id", customer_ids)
+                .limit(100)
+                .execute()
+            ) if customer_ids else []
+            customer_by_id = self._customer_map(customers)
+            projects = self._rows(
+                client.table("projects")
+                .select("id,customer_id,service_type,product_category,product_count,image_count,deadline,status")
+                .eq("company_id", self.company_id)
+                .in_("customer_id", customer_ids)
+                .order("created_at", desc=True)
+                .limit(100)
+                .execute()
+            ) if customer_ids else []
+            project_by_customer: dict[str, Record] = {}
+            for project in projects:
+                project_by_customer.setdefault(str(project.get("customer_id")), project)
+
+            items = []
+            for lead in leads:
+                customer = customer_by_id.get(str(lead.get("customer_id")), {})
+                project = project_by_customer.get(str(lead.get("customer_id")), {})
+                items.append({
+                    "id": lead.get("id"),
+                    "customer_name": customer.get("name"),
+                    "email": customer.get("email"),
+                    "phone": customer.get("phone"),
+                    "status": lead.get("status"),
+                    "source": lead.get("source"),
+                    "intent": lead.get("intent"),
+                    "estimated_value": lead.get("estimated_value"),
+                    "created_at": lead.get("created_at"),
+                    "service": project.get("service_type"),
+                    "project_details": project,
+                })
+            return items, total
+
+        return await self._run(execute)
+
+    async def get_lead(self, lead_id: UUID) -> Record | None:
+        """Return one tenant lead with its customer and project details."""
+        lead_id = str(lead_id)
+
+        def execute(client) -> Record | None:
+            lead = self._one(
+                client.table("leads")
+                .select("id,customer_id,status,source,intent,estimated_value,created_at")
+                .eq("company_id", self.company_id)
+                .eq("id", lead_id)
+                .limit(1)
+                .execute(),
+            )
+            if lead is None:
+                return None
+            customer = self._one(
+                client.table("customers")
+                .select("id,name,email,phone,business_name,industry")
+                .eq("company_id", self.company_id)
+                .eq("id", lead["customer_id"])
+                .limit(1)
+                .execute(),
+                required=True,
+            )
+            project = self._one(
+                client.table("projects")
+                .select("id,service_type,product_category,product_count,image_count,deadline,status")
+                .eq("company_id", self.company_id)
+                .eq("customer_id", lead["customer_id"])
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute(),
+            ) or {}
+            return {
+                "id": lead.get("id"),
+                "customer_name": customer.get("name"),
+                "email": customer.get("email"),
+                "phone": customer.get("phone"),
+                "business_name": customer.get("business_name"),
+                "industry": customer.get("industry"),
+                "status": lead.get("status"),
+                "source": lead.get("source"),
+                "intent": lead.get("intent"),
+                "estimated_value": lead.get("estimated_value"),
+                "created_at": lead.get("created_at"),
+                "service": project.get("service_type"),
+                "project_details": project,
+            }
 
         return await self._run(execute)

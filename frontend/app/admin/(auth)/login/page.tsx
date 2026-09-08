@@ -30,7 +30,7 @@ export default async function AdminLoginPage() {
           <h1 className="mt-5 font-serif text-5xl leading-[0.95] sm:text-6xl">Studio administration.</h1>
           <p className="mt-6 max-w-sm text-sm leading-6 text-paper/50">Sign in to review enquiries and manage booking requests.</p>
           <AdminLoginForm />
-          <p className="mt-8 text-[9px] uppercase leading-5 tracking-[0.16em] text-paper/25">Protected by a signed, HTTP-only session.</p>
+          <p className="mt-8 text-[9px] uppercase leading-5 tracking-[0.16em] text-paper/25">Secure access powered by Supabase Auth.</p>
         </div>
       </section>
     </div>

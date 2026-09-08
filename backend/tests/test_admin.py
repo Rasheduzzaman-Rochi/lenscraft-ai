@@ -105,6 +105,37 @@ class AdminReadApiTests(unittest.TestCase):
             )
         self.assertEqual(invalid.status_code, 422)
 
+    def test_booking_detail_and_lead_routes_require_admin_key_and_return_data(self):
+        booking = AdminBooking(
+            id=uuid4(), customer_name="Customer", service="Portrait",
+            date_time=datetime.now(UTC), status=BookingStatus.PENDING,
+            created_at=datetime.now(UTC),
+        )
+        lead = AdminLead(
+            id=uuid4(), customer_name="Lead", status="new",
+            created_at=datetime.now(UTC),
+        )
+        with patch("app.api.v1.routes.admin.AdminService.get_booking", new=AsyncMock(return_value=booking)):
+            with self.client() as client:
+                response = client.get(
+                    f"/api/v1/admin/bookings/{booking.id}",
+                    headers={"X-Admin-API-Key": "admin-test-key-not-real"},
+                )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["id"], str(booking.id))
+
+        with patch("app.api.v1.routes.admin.AdminService.list_leads", new=AsyncMock(return_value={
+            "items": [lead], "total": 1, "limit": 50, "offset": 0,
+        })) as method:
+            with self.client() as client:
+                response = client.get(
+                    "/api/v1/admin/leads",
+                    headers={"X-Admin-API-Key": "admin-test-key-not-real"},
+                )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["items"][0]["id"], str(lead.id))
+        method.assert_awaited_once_with(limit=50, offset=0)
+
 
 if __name__ == "__main__":
     unittest.main()

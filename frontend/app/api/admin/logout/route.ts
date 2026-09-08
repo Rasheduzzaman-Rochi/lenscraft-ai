@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { ADMIN_SESSION_COOKIE, adminSessionCookieOptions, hasAdminSession } from "@/lib/admin/session";
+import { hasAdminSession } from "@/lib/admin/session";
+import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -13,10 +14,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Logout request was not accepted." }, { status: 403 });
     }
   }
-  if (!(await hasAdminSession())) {
-    return NextResponse.json({ success: true }, { headers: { "Cache-Control": "no-store" } });
+  if (await hasAdminSession()) {
+    const supabase = await createClient();
+    await supabase.auth.signOut();
   }
-  const response = NextResponse.json({ success: true }, { headers: { "Cache-Control": "no-store" } });
-  response.cookies.set(ADMIN_SESSION_COOKIE, "", { ...adminSessionCookieOptions, maxAge: 0 });
-  return response;
+  return NextResponse.json(
+    { success: true },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }

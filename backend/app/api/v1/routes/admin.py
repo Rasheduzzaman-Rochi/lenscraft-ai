@@ -2,12 +2,13 @@
 
 import logging
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from app.core.security import require_admin_auth
 from app.repositories.errors import RepositoryError
-from app.schemas.admin import AdminBookingList, AdminDashboard
+from app.schemas.admin import AdminBooking, AdminBookingList, AdminDashboard, AdminLead, AdminLeadList
 from app.schemas.booking import BookingStatus
 from app.services.admin_service import AdminDataError, AdminService
 
@@ -64,3 +65,59 @@ async def list_bookings(
     except RepositoryError:
         logger.warning("Admin booking list query failed")
         raise HTTPException(503, "Booking data is temporarily unavailable.") from None
+
+
+@router.get("/bookings/{booking_id}", response_model=AdminBooking)
+async def get_booking(
+    booking_id: UUID,
+    response: Response,
+    _admin_auth: AdminAuthDependency,
+    service: AdminServiceDependency,
+) -> AdminBooking:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return await service.get_booking(booking_id)
+    except KeyError:
+        raise HTTPException(404, "Booking not found.") from None
+    except AdminDataError:
+        raise HTTPException(409, "Booking data is unavailable.") from None
+    except RepositoryError:
+        logger.warning("Admin booking query failed")
+        raise HTTPException(503, "Booking data is temporarily unavailable.") from None
+
+
+@router.get("/leads", response_model=AdminLeadList)
+async def list_leads(
+    response: Response,
+    _admin_auth: AdminAuthDependency,
+    service: AdminServiceDependency,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> AdminLeadList:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return await service.list_leads(limit=limit, offset=offset)
+    except AdminDataError:
+        raise HTTPException(409, "Lead data is unavailable.") from None
+    except RepositoryError:
+        logger.warning("Admin lead list query failed")
+        raise HTTPException(503, "Lead data is temporarily unavailable.") from None
+
+
+@router.get("/leads/{lead_id}", response_model=AdminLead)
+async def get_lead(
+    lead_id: UUID,
+    response: Response,
+    _admin_auth: AdminAuthDependency,
+    service: AdminServiceDependency,
+) -> AdminLead:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return await service.get_lead(lead_id)
+    except KeyError:
+        raise HTTPException(404, "Lead not found.") from None
+    except AdminDataError:
+        raise HTTPException(409, "Lead data is unavailable.") from None
+    except RepositoryError:
+        logger.warning("Admin lead query failed")
+        raise HTTPException(503, "Lead data is temporarily unavailable.") from None

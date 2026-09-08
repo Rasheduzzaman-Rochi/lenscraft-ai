@@ -1,15 +1,18 @@
 "use client";
 
-import { CalendarDays, LayoutDashboard, LogOut, Menu, X } from "lucide-react";
+import { CalendarDays, LayoutDashboard, LogOut, Menu, Settings, UserRound, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 
 const links = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/bookings", label: "Bookings", icon: CalendarDays },
+  { href: "/admin/leads", label: "Leads", icon: Users },
+  { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
@@ -17,6 +20,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [email, setEmail] = useState<string>();
+
+  useEffect(() => {
+    void createClient().auth.getUser().then(({ data }) => setEmail(data.user?.email ?? undefined)).catch(() => null);
+  }, []);
 
   async function logout() {
     setLoggingOut(true);
@@ -78,7 +86,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <div className="lg:pl-[280px]">
         <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-ink/10 bg-[#f4f1ea]/90 px-5 backdrop-blur-xl sm:px-8 lg:px-12">
           <button type="button" onClick={() => setOpen(true)} className="grid h-10 w-10 place-items-center lg:hidden" aria-label="Open navigation"><Menu className="h-5 w-5" /></button>
-          <p className="hidden text-[9px] font-semibold uppercase tracking-[0.22em] text-ink/40 sm:block">LensCraft Studio / Operations</p>
+          <div className="hidden items-center gap-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink/40 sm:flex"><UserRound className="h-3.5 w-3.5" />{email ?? "Studio admin"}</div>
           <Link href="/" className="text-[9px] font-semibold uppercase tracking-[0.2em] text-ink/45 transition hover:text-bronze">View website</Link>
         </header>
         <div className="px-5 py-10 sm:px-8 lg:px-12 lg:py-14">{children}</div>

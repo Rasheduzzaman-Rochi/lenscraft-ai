@@ -7,17 +7,17 @@ import { useState } from "react";
 import type { BookingStatus } from "@/lib/admin/types";
 import { cn } from "@/lib/utils";
 
-const actions: Array<{ status: Exclude<BookingStatus, "pending" | "cancelled">; label: string; className: string }> = [
+const actions: Array<{ status: Exclude<BookingStatus, "pending">; label: string; className: string }> = [
   { status: "confirmed", label: "Confirm", className: "bg-ink text-paper hover:bg-bronze" },
   { status: "rejected", label: "Reject", className: "border border-ink/15 hover:border-[#8d433b] hover:text-[#8d433b]" },
 ];
 
-export function BookingActions({ bookingId }: { bookingId: string }) {
+export function BookingActions({ bookingId, allowCancel = false }: { bookingId: string; allowCancel?: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState<BookingStatus | null>(null);
   const [message, setMessage] = useState<string>();
 
-  async function update(status: Exclude<BookingStatus, "pending" | "cancelled">) {
+  async function update(status: Exclude<BookingStatus, "pending">) {
     const accepted = window.confirm(`Mark this booking as ${status}? This action cannot be reversed here.`);
     if (!accepted) return;
     setBusy(status);
@@ -33,7 +33,8 @@ export function BookingActions({ bookingId }: { bookingId: string }) {
         setMessage(typeof result?.message === "string" ? result.message : "The booking could not be updated.");
         return;
       }
-      router.refresh();
+      setMessage(`Booking ${status} successfully.`);
+      window.setTimeout(() => router.refresh(), 450);
     } catch {
       setMessage("The booking could not be updated. Please try again.");
     } finally {
@@ -44,7 +45,7 @@ export function BookingActions({ bookingId }: { bookingId: string }) {
   return (
     <div>
       <div className="flex flex-wrap gap-2">
-        {actions.map((action) => (
+        {(allowCancel ? [...actions, { status: "cancelled" as const, label: "Cancel", className: "border border-ink/15 hover:border-[#8d433b] hover:text-[#8d433b]" }] : actions).map((action) => (
           <button
             key={action.status}
             type="button"
