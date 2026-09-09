@@ -1,23 +1,30 @@
 import { NextResponse } from "next/server";
 
-import { hasAdminSession } from "@/lib/admin/session";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
-export async function POST(request: Request) {
-  const origin = request.headers.get("origin");
-  if (origin) {
-    try {
-      if (new URL(origin).host !== new URL(request.url).host) throw new Error();
-    } catch {
-      return NextResponse.json({ message: "Logout request was not accepted." }, { status: 403 });
-    }
-  }
-  if (await hasAdminSession()) {
+export async function POST() {
+  try {
     const supabase = await createClient();
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.warn("[admin-auth] sign out failed", { error: error.name });
+      return NextResponse.json(
+        { message: "The admin session could not be ended." },
+        { status: 500, headers: { "Cache-Control": "private, no-store" } },
+      );
+    }
+  } catch (error) {
+    console.warn("[admin-auth] sign out failed", {
+      error: error instanceof Error ? error.name : "unknown",
+    });
+    return NextResponse.json(
+      { message: "The admin session could not be ended." },
+      { status: 500, headers: { "Cache-Control": "private, no-store" } },
+    );
   }
+
   return NextResponse.json(
     { success: true },
     { headers: { "Cache-Control": "private, no-store" } },

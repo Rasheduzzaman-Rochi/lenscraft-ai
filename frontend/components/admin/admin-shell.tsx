@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { signOutAdmin } from "@/lib/admin/sign-out";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
@@ -20,6 +21,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string>();
   const [email, setEmail] = useState<string>();
 
   useEffect(() => {
@@ -28,9 +30,15 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   async function logout() {
     setLoggingOut(true);
-    await fetch("/api/admin/logout", { method: "POST" }).catch(() => null);
-    router.replace("/admin/login");
-    router.refresh();
+    setLogoutError(undefined);
+    try {
+      await signOutAdmin();
+      router.replace("/admin/login");
+      router.refresh();
+    } catch {
+      setLogoutError("We could not sign you out. Please try again.");
+      setLoggingOut(false);
+    }
   }
 
   return (
@@ -77,6 +85,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             >
               <LogOut className="h-4 w-4" /> {loggingOut ? "Signing out" : "Sign out"}
             </button>
+            {logoutError ? <p role="alert" className="mt-2 px-4 text-xs leading-5 text-[#e7b7af]">{logoutError}</p> : null}
           </div>
         </div>
       </aside>
