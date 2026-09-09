@@ -17,6 +17,10 @@ values, FastAPI origin, server-only admin API key, and fixed company UUID.
 `ADMIN_API_KEY` must match the backend deployment and must never use a
 `NEXT_PUBLIC_` prefix.
 
+The voice assistant requires the public `NEXT_PUBLIC_RETELL_AGENT_ID` and the
+server-only `RETELL_API_KEY`. The API key must only be configured on the running
+Next.js service.
+
 ## Production build
 
 ```sh

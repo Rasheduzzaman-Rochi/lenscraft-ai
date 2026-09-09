@@ -115,6 +115,7 @@ export function VoiceAssistant() {
       const response = await fetch("/api/voice/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
         cache: "no-store",
       });
       const payload = (await response.json().catch(() => null)) as SessionResponse | null;
