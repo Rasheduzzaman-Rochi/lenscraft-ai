@@ -37,10 +37,10 @@ export function BookingActions({ bookingId, currentStatus }: { bookingId: string
     setBusy(status);
     setMessage(undefined);
     try {
-      const response = await fetch("/api/admin/bookings/status", {
+      const response = await fetch(`/api/admin/bookings/${encodeURIComponent(bookingId)}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ booking_id: bookingId, status }),
+        body: JSON.stringify({ status }),
       });
       const result = await response.json().catch(() => null) as { message?: unknown } | null;
       if (!response.ok) {

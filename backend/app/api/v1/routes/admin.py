@@ -7,12 +7,25 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from app.core.security import require_admin_auth
-from app.repositories.errors import RepositoryError
-from app.schemas.admin import AdminBooking, AdminBookingCreate, AdminBookingList, AdminDashboard, AdminLead, AdminLeadList, AdminLeadStatusUpdate
-from app.schemas.tools import CreateBookingResponse
 from app.repositories.booking_repository import BookingRepository
-from app.repositories.errors import RecordNotFoundError, RepositoryConflictError, RepositoryIntegrityError
+from app.repositories.errors import (
+    RecordNotFoundError,
+    RepositoryConflictError,
+    RepositoryError,
+    RepositoryIntegrityError,
+)
+from app.schemas.admin import (
+    AdminBooking,
+    AdminBookingCreate,
+    AdminBookingList,
+    AdminDashboard,
+    AdminDeleteResponse,
+    AdminLead,
+    AdminLeadList,
+    AdminLeadStatusUpdate,
+)
 from app.schemas.booking import BookingStatus
+from app.schemas.tools import CreateBookingResponse
 from app.services.admin_service import AdminDataError, AdminService
 
 
@@ -89,6 +102,29 @@ async def get_booking(
         raise HTTPException(503, "Booking data is temporarily unavailable.") from None
 
 
+@router.delete("/bookings/{booking_id}", response_model=AdminDeleteResponse)
+async def delete_booking(
+    booking_id: UUID,
+    response: Response,
+    _admin_auth: AdminAuthDependency,
+    service: AdminServiceDependency,
+) -> AdminDeleteResponse:
+    """Delete one booking belonging to the configured company."""
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return await service.delete_booking(booking_id)
+    except RecordNotFoundError:
+        raise HTTPException(404, "Booking not found.") from None
+    except AdminDataError:
+        logger.warning("Admin booking deletion received invalid stored data")
+        raise HTTPException(409, "Booking could not be deleted.") from None
+    except RepositoryIntegrityError:
+        raise HTTPException(409, "Booking is still referenced by another record.") from None
+    except RepositoryError:
+        logger.warning("Admin booking deletion failed")
+        raise HTTPException(503, "Booking deletion is temporarily unavailable.") from None
+
+
 @router.get("/leads", response_model=AdminLeadList)
 async def list_leads(
     response: Response,
@@ -124,6 +160,29 @@ async def get_lead(
     except RepositoryError:
         logger.warning("Admin lead query failed")
         raise HTTPException(503, "Lead data is temporarily unavailable.") from None
+
+
+@router.delete("/leads/{lead_id}", response_model=AdminDeleteResponse)
+async def delete_lead(
+    lead_id: UUID,
+    response: Response,
+    _admin_auth: AdminAuthDependency,
+    service: AdminServiceDependency,
+) -> AdminDeleteResponse:
+    """Delete one lead belonging to the configured company."""
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return await service.delete_lead(lead_id)
+    except RecordNotFoundError:
+        raise HTTPException(404, "Lead not found.") from None
+    except AdminDataError:
+        logger.warning("Admin lead deletion received invalid stored data")
+        raise HTTPException(409, "Lead could not be deleted.") from None
+    except RepositoryIntegrityError:
+        raise HTTPException(409, "Lead is still referenced by another record.") from None
+    except RepositoryError:
+        logger.warning("Admin lead deletion failed")
+        raise HTTPException(503, "Lead deletion is temporarily unavailable.") from None
 
 
 @router.patch("/leads/{lead_id}/status", response_model=AdminLead)

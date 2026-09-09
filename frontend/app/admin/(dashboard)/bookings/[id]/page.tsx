@@ -2,6 +2,7 @@ import { ArrowLeft, Mail, Phone } from "lucide-react";
 import Link from "next/link";
 
 import { BookingActions } from "@/components/admin/booking-actions";
+import { DeleteAdminRecord } from "@/components/admin/delete-admin-record";
 import { RetryButton } from "@/components/admin/retry-button";
 import { AdminBackendError, getAdminBooking } from "@/lib/admin/backend";
 import type { BookingStatus } from "@/lib/admin/types";
@@ -33,6 +34,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
         <section className="border border-ink/10 bg-paper p-6 sm:p-8"><p className="eyebrow">Customer</p><h2 className="mt-3 font-serif text-3xl">{booking.customer_name}</h2><dl className="mt-6 space-y-5 text-sm"><div><dt className="eyebrow">Email</dt><dd className="mt-2"><a href={booking.email ? `mailto:${booking.email}` : undefined} className="inline-flex items-center gap-2 text-bronze hover:text-ink"><Mail className="h-3.5 w-3.5" />{booking.email ?? "Not supplied"}</a></dd></div><div><dt className="eyebrow">Phone</dt><dd className="mt-2"><a href={booking.phone ? `tel:${booking.phone}` : undefined} className="inline-flex items-center gap-2 text-bronze hover:text-ink"><Phone className="h-3.5 w-3.5" />{booking.phone ?? "Not supplied"}</a></dd></div><div><dt className="eyebrow">Company / brand</dt><dd className="mt-2 text-ink/60">{booking.business_name ?? "Not supplied"}</dd></div><div><dt className="eyebrow">Industry</dt><dd className="mt-2 text-ink/60">{booking.industry ?? "Not supplied"}</dd></div></dl></section>
       </div>
       {normalizedStatus === "pending" || normalizedStatus === "confirmed" ? <div className="mt-6 border border-ink/10 bg-paper p-6"><p className="eyebrow">Actions</p><div className="mt-4"><BookingActions bookingId={booking.id} currentStatus={normalizedStatus} /></div></div> : null}
+      <DeleteAdminRecord id={booking.id} resource="booking" />
     </div>
   );
 }

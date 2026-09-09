@@ -14,23 +14,7 @@ const allowedStatuses = new Set<Exclude<BookingStatus, "pending">>([
   "cancelled",
 ]);
 
-function isSameOrigin(request: Request) {
-  const origin = request.headers.get("origin");
-  if (!origin) return true;
-  try {
-    return new URL(origin).host === new URL(request.url).host;
-  } catch {
-    return false;
-  }
-}
-
 export async function PATCH(request: Request) {
-  if (!isSameOrigin(request)) {
-    return NextResponse.json(
-      { message: "Booking update was not accepted." },
-      { status: 403, headers: { "Cache-Control": "no-store" } },
-    );
-  }
   if (!(await hasAdminSession())) {
     return NextResponse.json(
       { message: "Your admin session has expired." },
@@ -43,7 +27,7 @@ export async function PATCH(request: Request) {
     const bookingId = requiredText(body, "booking_id", 36);
     const status = requiredText(body, "status", 20) as BookingStatus;
     if (!BOOKING_ID.test(bookingId) || !allowedStatuses.has(
-      status as Exclude<BookingStatus, "pending" | "cancelled">,
+      status as Exclude<BookingStatus, "pending">,
     )) {
       throw new Error("Invalid booking update");
     }

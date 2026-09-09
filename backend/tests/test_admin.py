@@ -9,11 +9,13 @@ from fastapi.testclient import TestClient
 
 from app.core.config import Settings
 from app.main import create_app
+from app.repositories.errors import RecordNotFoundError
 from app.schemas.admin import (
     AdminBooking,
     AdminBookingList,
     AdminBookingStats,
     AdminDashboard,
+    AdminDeleteResponse,
     AdminLead,
 )
 from app.schemas.booking import BookingStatus
@@ -135,6 +137,40 @@ class AdminReadApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["items"][0]["id"], str(lead.id))
         method.assert_awaited_once_with(limit=50, offset=0)
+
+    def test_admin_can_delete_company_booking_and_lead(self):
+        for resource, method_name in (("bookings", "delete_booking"), ("leads", "delete_lead")):
+            record_id = uuid4()
+            expected = AdminDeleteResponse(id=record_id)
+            with self.subTest(resource=resource), patch(
+                f"app.api.v1.routes.admin.AdminService.{method_name}",
+                new=AsyncMock(return_value=expected),
+            ) as method, self.client() as client:
+                response = client.delete(
+                    f"/api/v1/admin/{resource}/{record_id}",
+                    headers={"X-Admin-API-Key": "admin-test-key-not-real"},
+                )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json(), {"id": str(record_id), "deleted": True})
+            self.assertEqual(response.headers["cache-control"], "no-store")
+            method.assert_awaited_once_with(record_id)
+
+    def test_admin_delete_requires_authentication_and_maps_not_found(self):
+        record_id = uuid4()
+        with self.client() as client:
+            unauthenticated = client.delete(f"/api/v1/admin/bookings/{record_id}")
+        self.assertEqual(unauthenticated.status_code, 401)
+
+        with patch(
+            "app.api.v1.routes.admin.AdminService.delete_lead",
+            new=AsyncMock(side_effect=RecordNotFoundError("not found")),
+        ), self.client() as client:
+            missing = client.delete(
+                f"/api/v1/admin/leads/{record_id}",
+                headers={"X-Admin-API-Key": "admin-test-key-not-real"},
+            )
+        self.assertEqual(missing.status_code, 404)
+        self.assertEqual(missing.json(), {"detail": "Lead not found."})
 
 
 if __name__ == "__main__":

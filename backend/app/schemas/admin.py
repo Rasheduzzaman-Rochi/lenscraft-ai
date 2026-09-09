@@ -65,6 +65,13 @@ class AdminLeadStatusUpdate(BaseModel):
     status: Literal["new", "contacted", "qualified", "converted", "lost"]
 
 
+class AdminDeleteResponse(BaseModel):
+    """Confirmation for one tenant-scoped administrative deletion."""
+
+    id: UUID
+    deleted: Literal[True] = True
+
+
 class AdminBookingCreate(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 

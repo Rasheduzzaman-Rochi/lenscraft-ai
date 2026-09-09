@@ -137,6 +137,13 @@ export function getAdminBooking(bookingId: string) {
     });
 }
 
+export function deleteAdminBooking(bookingId: string) {
+  return request<{ id: string; deleted: true }>(
+    `/api/v1/admin/bookings/${encodeURIComponent(bookingId)}`,
+    { method: "DELETE" },
+  );
+}
+
 export function getAdminLeads(options: { limit?: number; offset?: number } = {}) {
   const defaults = { limit: options.limit ?? 50, offset: options.offset ?? 0 };
   const query = new URLSearchParams({
@@ -154,6 +161,13 @@ export function getAdminLead(leadId: string) {
       if (!lead) throw new AdminBackendError(502, "invalid-response");
       return lead;
     });
+}
+
+export function deleteAdminLead(leadId: string) {
+  return request<{ id: string; deleted: true }>(
+    `/api/v1/admin/leads/${encodeURIComponent(leadId)}`,
+    { method: "DELETE" },
+  );
 }
 
 export function updateAdminLeadStatus(leadId: string, status: AdminLeadStatus) {

@@ -14,14 +14,6 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ bookingId: string }> },
 ) {
-  const origin = request.headers.get("origin");
-  if (origin) {
-    try {
-      if (new URL(origin).host !== new URL(request.url).host) throw new Error();
-    } catch {
-      return NextResponse.json({ message: "Booking update was not accepted." }, { status: 403 });
-    }
-  }
   if (!(await hasAdminSession())) {
     return NextResponse.json({ message: "Your admin session has expired." }, { status: 401 });
   }

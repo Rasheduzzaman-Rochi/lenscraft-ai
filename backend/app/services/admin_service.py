@@ -11,6 +11,7 @@ from app.schemas.admin import (
     AdminBookingList,
     AdminBookingStats,
     AdminDashboard,
+    AdminDeleteResponse,
     AdminLead,
     AdminLeadList,
     AdminLeadStats,
@@ -99,6 +100,21 @@ class AdminService:
             raise AdminDataError("Stored lead data is invalid") from None
 
     async def update_lead_status(self, lead_id: UUID, status: AdminLeadStatusUpdate) -> AdminLead:
-        row = await self.repository.update_lead_status(lead_id, status.status)
-        lead = await self.get_lead(lead_id)
-        return lead
+        await self.repository.update_lead_status(lead_id, status.status)
+        return await self.get_lead(lead_id)
+
+    async def delete_booking(self, booking_id: UUID) -> AdminDeleteResponse:
+        """Delete one booking within the configured tenant."""
+        row = await self.repository.delete_booking(booking_id)
+        try:
+            return AdminDeleteResponse(id=row["id"])
+        except (KeyError, ValidationError):
+            raise AdminDataError("Deleted booking data is invalid") from None
+
+    async def delete_lead(self, lead_id: UUID) -> AdminDeleteResponse:
+        """Delete one lead within the configured tenant."""
+        row = await self.repository.delete_lead(lead_id)
+        try:
+            return AdminDeleteResponse(id=row["id"])
+        except (KeyError, ValidationError):
+            raise AdminDataError("Deleted lead data is invalid") from None

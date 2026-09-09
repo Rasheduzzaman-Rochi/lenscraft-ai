@@ -351,3 +351,23 @@ class AdminRepository(BaseRepository):
             .execute(),
             required=True,
         ))
+
+    async def delete_booking(self, booking_id: UUID) -> Record:
+        """Delete exactly one booking owned by this repository's company."""
+        return await self._run(lambda client: self._one(
+            client.table("bookings").delete()
+            .eq("company_id", self.company_id)
+            .eq("id", str(booking_id))
+            .execute(),
+            required=True,
+        ))
+
+    async def delete_lead(self, lead_id: UUID) -> Record:
+        """Delete exactly one lead owned by this repository's company."""
+        return await self._run(lambda client: self._one(
+            client.table("leads").delete()
+            .eq("company_id", self.company_id)
+            .eq("id", str(lead_id))
+            .execute(),
+            required=True,
+        ))

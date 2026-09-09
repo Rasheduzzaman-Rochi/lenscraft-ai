@@ -11,6 +11,7 @@ import httpx
 from pydantic import ValidationError
 from supabase import ClientOptions, create_client
 
+from app.repositories.admin_repository import AdminRepository
 from app.repositories.call_repository import CallRepository
 from app.repositories.booking_repository import BookingRepository
 from app.repositories.customer_repository import CustomerRepository
@@ -188,6 +189,27 @@ class RepositoryTests(unittest.IsolatedAsyncioTestCase):
                 BookingStatus.REJECTED,
                 expected_status=BookingStatus.PENDING,
             )
+
+    async def test_admin_deletes_are_tenant_and_record_scoped(self):
+        for table, method_name in (("bookings", "delete_booking"), ("leads", "delete_lead")):
+            with self.subTest(table=table):
+                self.responses.append(self.row_response())
+                result = await getattr(
+                    AdminRepository(self.company, client=self.client), method_name,
+                )(self.record)
+                request = self.requests[-1]
+                self.assertEqual(request.method, "DELETE")
+                self.assertEqual(request.url.path, f"/rest/v1/{table}")
+                self.assertEqual(request.url.params["company_id"], f"eq.{self.company}")
+                self.assertEqual(request.url.params["id"], f"eq.{self.record}")
+                self.assertEqual(result["id"], str(self.record))
+
+    async def test_admin_delete_missing_record_is_not_found(self):
+        self.responses.append(httpx.Response(200, json=[]))
+        with self.assertRaises(RecordNotFoundError):
+            await AdminRepository(
+                self.company, client=self.client,
+            ).delete_booking(self.record)
 
     async def test_booking_conflict_query_is_tenant_scoped_and_exact(self):
         self.responses.append(httpx.Response(200, json=[{

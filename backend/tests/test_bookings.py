@@ -204,6 +204,25 @@ class BookingStatusServiceTests(unittest.IsolatedAsyncioTestCase):
             expected_status=BookingStatus.CONFIRMED,
         )
 
+    async def test_pending_booking_can_be_rejected(self):
+        booking_id = uuid4()
+        service, bookings = self.service([])
+        bookings.get_booking_by_id.return_value = {
+            "id": str(booking_id), "status": "pending",
+        }
+        bookings.update_booking_status.return_value = {
+            "id": str(booking_id), "status": "rejected",
+        }
+
+        result = await service.update_status(booking_id, BookingStatus.REJECTED)
+
+        self.assertEqual(result.status, BookingStatus.REJECTED)
+        bookings.update_booking_status.assert_awaited_once_with(
+            booking_id,
+            BookingStatus.REJECTED,
+            expected_status=BookingStatus.PENDING,
+        )
+
     async def test_invalid_status_transitions_are_conflicts(self):
         cases = [
             ('confirmed', BookingStatus.CONFIRMED),

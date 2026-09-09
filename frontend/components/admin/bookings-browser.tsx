@@ -156,6 +156,17 @@ export function BookingsBrowser({ initialData, initialError, initialPage, initia
   }, []);
 
   useEffect(() => {
+    activeRequest.current += 1;
+    cache.current.clear();
+    if (initialData) cache.current.set(cacheKey(initialStatus, initialPage), initialData);
+    setSelected(initialStatus);
+    setPage(initialPage);
+    setData(initialData);
+    setError(initialError);
+    setLoading(false);
+  }, [initialData, initialError, initialPage, initialStatus]);
+
+  useEffect(() => {
     const handlePopState = () => {
       const location = readLocation();
       void load(location.status, location.page, { history: "none" });
