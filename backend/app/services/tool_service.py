@@ -392,10 +392,10 @@ class ToolService:
 
     def _require_company(
         self,
-        company_id: UUID,
+        company_id: UUID | None,
     ) -> None:
 
-        if company_id != self.company_id:
+        if company_id is not None and company_id != self.company_id:
 
             raise PermissionError(
                 "Tool request belongs to another company"

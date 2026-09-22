@@ -26,7 +26,7 @@ class ToolRequest(BaseModel):
 
 
 class SearchServiceRequest(ToolRequest):
-    company_id: UUID
+    company_id: UUID | None = Field(default=None, exclude=True)
     query: str = Field(min_length=1, max_length=500)
     limit: int = Field(default=5, ge=1, le=10, strict=True)
 
@@ -71,7 +71,7 @@ class ProjectRequirements(WriteData):
 class CreateLeadRequest(ToolRequest):
     """One idempotent customer, lead, and project command."""
 
-    company_id: UUID
+    company_id: UUID | None = Field(default=None, exclude=True)
     request_id: str = Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9_.:-]+$")
     customer: CustomerCreate
     lead: LeadDetails = Field(default_factory=LeadDetails)
@@ -88,7 +88,7 @@ class CreateLeadResponse(BaseModel):
 
 
 class SearchKnowledgeRequest(ToolRequest):
-    company_id: UUID
+    company_id: UUID | None = Field(default=None, exclude=True)
     question: str = Field(min_length=1, max_length=10_000)
     limit: int = Field(default=5, ge=1, le=10, strict=True)
 
@@ -108,7 +108,7 @@ class SearchKnowledgeResponse(BaseModel):
 class CreateBookingRequest(ToolRequest):
     """Validated customer and appointment data for one booking command."""
 
-    company_id: UUID
+    company_id: UUID | None = Field(default=None, exclude=True)
     customer: CustomerCreate
     date_time: AwareDatetime
     service_type: str = Field(min_length=1, max_length=500)
@@ -147,7 +147,7 @@ CreateBookingResult = CreateBookingResponse | CreateBookingConflictResponse
 
 
 class CheckBookingAvailabilityRequest(ToolRequest):
-    company_id: UUID
+    company_id: UUID | None = Field(default=None, exclude=True)
     date_time: AwareDatetime
 
 
@@ -158,7 +158,7 @@ class CheckBookingAvailabilityResponse(BookingAvailability):
 class GetBookingStatusRequest(ToolRequest):
     """Strong identifiers accepted for a customer-facing booking lookup."""
 
-    company_id: UUID
+    company_id: UUID | None = Field(default=None, exclude=True)
     email: str | None = Field(default=None, max_length=320)
     phone: str | None = Field(default=None, max_length=50)
     booking_id: UUID | None = None

@@ -12,7 +12,7 @@ class QuoteCalculateRequest(BaseModel):
     """Client selects add-on codes, never prices or rule values."""
 
     model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
-    company_id: UUID
+    company_id: UUID | None = Field(default=None, exclude=True)
     service_name: str = Field(min_length=1, max_length=200)
     image_count: Count
     addons: list[str] = Field(default_factory=list, max_length=100)
