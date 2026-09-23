@@ -402,11 +402,12 @@ async def execute_knowledge_search(
         ) from None
 
 
-    except ValueError:
-
+    except ValueError as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             422,
-            "Knowledge search input is invalid."
+            f"Knowledge search input is invalid. Detail: {e}"
         ) from None
 
 
