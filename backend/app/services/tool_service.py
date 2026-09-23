@@ -342,7 +342,7 @@ class ToolService:
 
             KnowledgeSearchRequest(
 
-                company_id=request.company_id,
+                company_id=self.company_id,
 
                 query=request.question,
 

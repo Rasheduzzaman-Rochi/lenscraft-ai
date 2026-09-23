@@ -21,7 +21,7 @@ class BookingRepository(BaseRepository):
     ) -> Record:
         """Create both records atomically and return their identifiers."""
         request = CreateBookingRequest.model_validate(data)
-        if str(request.company_id) != self.company_id:
+        if request.company_id is not None and str(request.company_id) != self.company_id:
             raise ValueError("Booking does not belong to this repository company")
         parameters = {
             "p_company_id": self.company_id,
