@@ -1,26 +1,13 @@
-import { ArrowRight, CalendarCheck, CalendarClock, CalendarDays, CircleAlert, UserRoundPlus } from "lucide-react";
+import { ArrowRight, Camera, CalendarCheck, CalendarClock, CalendarDays, CircleAlert, Contact, UserRoundPlus } from "lucide-react";
 import Link from "next/link";
 
 import { adminConnectionMessage, getAdminBookings, getAdminDashboard } from "@/lib/admin/backend";
 import { RetryButton } from "@/components/admin/retry-button";
 import { BookingCalendar } from "@/components/admin/booking-calendar";
+import { getAdminDisplaySettings } from "@/lib/admin/records";
+import { formatDate as formatZonedDate, formatDateTime as formatZonedDateTime, formatMoney } from "@/lib/admin/time";
 import type { AdminBooking, AdminDashboard } from "@/lib/admin/types";
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "Asia/Dhaka",
-  }).format(new Date(value));
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
-    timeZone: "Asia/Dhaka", timeZoneName: "short",
-  }).format(new Date(value));
-}
 
 function StatusBadge({ status }: { status: AdminBooking["status"] }) {
   return <span className={`inline-flex px-3 py-2 text-[8px] font-semibold uppercase tracking-[0.16em] ${status === "confirmed" ? "bg-[#dce8db] text-[#39523a]" : status === "pending" ? "bg-[#eee3cc] text-[#765b2c]" : status === "rejected" ? "bg-[#eedbd7] text-[#7b4038]" : "bg-ink/5 text-ink/45"}`}>{status}</span>;
@@ -49,14 +36,19 @@ function normalizeDashboard(raw: Partial<AdminDashboard> = {}) {
       conversionRate: numberValue(leads.conversion_rate ?? raw.conversion_rate),
     },
     recentLeads: Array.isArray(raw.recent_leads) ? raw.recent_leads : [],
+    customers: raw.customers === undefined ? null : numberValue(raw.customers),
+    activeServices: raw.active_services === undefined ? null : numberValue(raw.active_services),
   };
 }
 
 export default async function AdminDashboardPage() {
-  const [dashboardResult, bookingsResult] = await Promise.allSettled([
-    getAdminDashboard(),
-    getAdminBookings({ limit: 100 }),
+  const [dashboardResult, bookingsResult, display] = await Promise.all([
+    getAdminDashboard().then((value) => ({ status: "fulfilled" as const, value }), (reason: unknown) => ({ status: "rejected" as const, reason })),
+    getAdminBookings({ limit: 100 }).then((value) => ({ status: "fulfilled" as const, value }), (reason: unknown) => ({ status: "rejected" as const, reason })),
+    getAdminDisplaySettings(),
   ]);
+  const formatDate = (value: string) => formatZonedDate(value, display.timeZone);
+  const formatDateTime = (value: string) => formatZonedDateTime(value, display.timeZone);
   const data = dashboardResult.status === "fulfilled" ? dashboardResult.value : null;
   const bookings = bookingsResult.status === "fulfilled" ? bookingsResult.value.items : [];
   const calendarBookings = bookings.filter((booking) => ["pending", "confirmed"].includes(booking.status.trim().toLowerCase()));
@@ -70,11 +62,13 @@ export default async function AdminDashboardPage() {
     dashboard.bookings.cancelled = bookings.filter((booking) => booking.status === "cancelled").length;
   }
   const stats = [
-    { label: "Total leads", value: dashboard.leads.total, icon: UserRoundPlus },
     { label: "Total bookings", value: dashboard.bookings.total, icon: CalendarDays },
     { label: "Pending review", value: dashboard.bookings.pending, icon: CalendarClock },
     { label: "Confirmed", value: dashboard.bookings.confirmed, icon: CalendarCheck },
-    { label: "Estimated revenue", value: `৳${dashboard.leads.estimatedRevenue.toLocaleString("en-BD")}`, icon: UserRoundPlus },
+    { label: "Total leads", value: dashboard.leads.total, icon: UserRoundPlus },
+    ...(dashboard.customers === null ? [] : [{ label: "Customers", value: dashboard.customers, icon: Contact }]),
+    ...(dashboard.activeServices === null ? [] : [{ label: "Active services", value: dashboard.activeServices, icon: Camera }]),
+    { label: "Estimated lead value", value: formatMoney(dashboard.leads.estimatedRevenue, display.currency), icon: UserRoundPlus },
     { label: "Conversion rate", value: `${dashboard.leads.conversionRate.toFixed(1)}%`, icon: UserRoundPlus },
   ];
 
@@ -109,7 +103,7 @@ export default async function AdminDashboardPage() {
               <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-ink/40">{label}</p>
               <Icon className="h-4 w-4 text-bronze" strokeWidth={1.4} />
             </div>
-            <p className="mt-8 font-serif text-5xl tracking-[-0.04em]">{typeof value === "number" ? value.toLocaleString() : value}</p>
+            <p className="mt-8 break-words font-serif text-4xl tracking-[-0.04em] sm:text-5xl">{typeof value === "number" ? value.toLocaleString() : value}</p>
           </article>
         ))}
       </div>
@@ -143,7 +137,7 @@ export default async function AdminDashboardPage() {
         )}
       </section>
 
-      <BookingCalendar bookings={calendarBookings} />
+      <BookingCalendar bookings={calendarBookings} timeZone={display.timeZone} />
       {bookingsResult.status === "rejected" ? <section className="mt-4 border border-[#b36a60]/30 bg-[#b36a60]/10 p-5"><p className="eyebrow text-[#85483f]">Calendar data unavailable</p><p className="mt-2 text-sm text-ink/55">{adminConnectionMessage(bookingsResult.reason)} The calendar remains available without event data.</p></section> : null}
 
       <section className="mt-10 border border-ink/10 bg-paper">

@@ -5,11 +5,16 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { BookingActions } from "@/components/admin/booking-actions";
-import { ADMIN_BOOKINGS_PAGE_SIZE } from "@/lib/admin/booking-list";
+import { adminInputClass, adminPrimaryButtonClass, adminSecondaryButtonClass } from "@/components/admin/ui";
+import { ADMIN_BOOKINGS_PAGE_SIZE, nextCalendarDate, readBookingFilters, type BookingTextFilters } from "@/lib/admin/booking-list";
+import { formatDateTime as formatZonedDateTime, zonedLocalToIso } from "@/lib/admin/time";
 import type { AdminBookingList, BookingStatus } from "@/lib/admin/types";
 import { cn } from "@/lib/utils";
 
 type FilterStatus = "all" | BookingStatus;
+
+const emptyFilters: BookingTextFilters = { search: "", service: "", from: "", to: "" };
+
 
 const statusOptions: Array<{ value: FilterStatus; label: string }> = [
   { value: "all", label: "All" },
@@ -24,30 +29,42 @@ type Props = {
   initialError: string | null;
   initialPage: number;
   initialStatus: FilterStatus;
+  initialFilters?: BookingTextFilters;
+  services: string[];
+  timeZone: string;
 };
 
-function cacheKey(status: FilterStatus, page: number) {
-  return `${status}:${page}`;
+function cacheKey(status: FilterStatus, page: number, filters: BookingTextFilters) {
+  return JSON.stringify([status, page, filters.search, filters.service, filters.from, filters.to]);
 }
 
-function pageUrl(status: FilterStatus, page: number) {
+function pageUrl(status: FilterStatus, page: number, filters: BookingTextFilters) {
   const query = new URLSearchParams();
   if (status !== "all") query.set("status", status);
+  if (filters.search) query.set("search", filters.search);
+  if (filters.service) query.set("service", filters.service);
+  if (filters.from) query.set("from", filters.from);
+  if (filters.to) query.set("to", filters.to);
   if (page > 1) query.set("page", String(page));
   const value = query.toString();
   return `/admin/bookings${value ? `?${value}` : ""}`;
 }
 
-function apiUrl(status: FilterStatus, page: number) {
+function apiUrl(status: FilterStatus, page: number, filters: BookingTextFilters, timeZone: string) {
   const query = new URLSearchParams({
     limit: String(ADMIN_BOOKINGS_PAGE_SIZE),
     offset: String((page - 1) * ADMIN_BOOKINGS_PAGE_SIZE),
   });
   if (status !== "all") query.set("status", status);
+  if (filters.search) query.set("search", filters.search);
+  if (filters.service) query.set("service", filters.service);
+  // Studio-local whole days become an absolute half-open range [from 00:00, day after "to" 00:00).
+  if (filters.from) query.set("date_from", zonedLocalToIso(`${filters.from}T00:00`, timeZone));
+  if (filters.to) query.set("date_to", zonedLocalToIso(`${nextCalendarDate(filters.to)}T00:00`, timeZone));
   return `/api/admin/bookings?${query}`;
 }
 
-function readLocation(): { status: FilterStatus; page: number } {
+function readLocation(): { status: FilterStatus; page: number; filters: BookingTextFilters } {
   const query = new URLSearchParams(window.location.search);
   const rawStatus = query.get("status");
   const status = statusOptions.some((option) => option.value === rawStatus)
@@ -57,19 +74,8 @@ function readLocation(): { status: FilterStatus; page: number } {
   return {
     status,
     page: Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1,
+    filters: readBookingFilters(query),
   };
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Asia/Dhaka",
-    timeZoneName: "short",
-  }).format(new Date(value));
 }
 
 function StatusBadge({ status }: { status: BookingStatus }) {
@@ -84,8 +90,8 @@ function StatusBadge({ status }: { status: BookingStatus }) {
   );
 }
 
-async function fetchBookings(status: FilterStatus, page: number) {
-  const response = await fetch(apiUrl(status, page), {
+async function fetchBookings(status: FilterStatus, page: number, filters: BookingTextFilters, timeZone: string) {
+  const response = await fetch(apiUrl(status, page, filters, timeZone), {
     credentials: "same-origin",
     headers: { Accept: "application/json" },
   });
@@ -100,9 +106,13 @@ async function fetchBookings(status: FilterStatus, page: number) {
   return payload as AdminBookingList;
 }
 
-export function BookingsBrowser({ initialData, initialError, initialPage, initialStatus }: Props) {
+export function BookingsBrowser({
+  initialData, initialError, initialPage, initialStatus, initialFilters = emptyFilters, services, timeZone,
+}: Props) {
   const [selected, setSelected] = useState(initialStatus);
   const [page, setPage] = useState(initialPage);
+  const [filters, setFilters] = useState(initialFilters);
+  const [draft, setDraft] = useState(initialFilters);
   const [data, setData] = useState(initialData);
   const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
@@ -111,20 +121,26 @@ export function BookingsBrowser({ initialData, initialError, initialPage, initia
   const activeRequest = useRef(0);
 
   if (initialData && cache.current.size === 0) {
-    cache.current.set(cacheKey(initialStatus, initialPage), initialData);
+    cache.current.set(cacheKey(initialStatus, initialPage, initialFilters), initialData);
   }
 
-  const load = useCallback(async (status: FilterStatus, nextPage: number, options?: { force?: boolean; history?: "replace" | "none" }) => {
+  const load = useCallback(async (
+    status: FilterStatus,
+    nextPage: number,
+    nextFilters: BookingTextFilters,
+    options?: { force?: boolean; history?: "replace" | "none" },
+  ) => {
     const requestId = ++activeRequest.current;
     setSelected(status);
     setPage(nextPage);
+    setFilters(nextFilters);
     setError(null);
 
     if (options?.history !== "none") {
-      window.history.replaceState(window.history.state, "", pageUrl(status, nextPage));
+      window.history.replaceState(window.history.state, "", pageUrl(status, nextPage, nextFilters));
     }
 
-    const key = cacheKey(status, nextPage);
+    const key = cacheKey(status, nextPage, nextFilters);
     const cached = options?.force ? undefined : cache.current.get(key);
     if (cached) {
       setData(cached);
@@ -136,7 +152,7 @@ export function BookingsBrowser({ initialData, initialError, initialPage, initia
     try {
       let request = requests.current.get(key);
       if (!request || options?.force) {
-        request = fetchBookings(status, nextPage);
+        request = fetchBookings(status, nextPage, nextFilters, timeZone);
         requests.current.set(key, request);
         void request.finally(() => {
           if (requests.current.get(key) === request) requests.current.delete(key);
@@ -153,36 +169,61 @@ export function BookingsBrowser({ initialData, initialError, initialPage, initia
     } finally {
       if (activeRequest.current === requestId) setLoading(false);
     }
-  }, []);
+  }, [timeZone]);
 
   useEffect(() => {
     activeRequest.current += 1;
     cache.current.clear();
-    if (initialData) cache.current.set(cacheKey(initialStatus, initialPage), initialData);
+    if (initialData) cache.current.set(cacheKey(initialStatus, initialPage, initialFilters), initialData);
     setSelected(initialStatus);
     setPage(initialPage);
+    setFilters(initialFilters);
+    setDraft(initialFilters);
     setData(initialData);
     setError(initialError);
     setLoading(false);
-  }, [initialData, initialError, initialPage, initialStatus]);
+  }, [initialData, initialError, initialPage, initialStatus, initialFilters]);
 
   useEffect(() => {
     const handlePopState = () => {
       const location = readLocation();
-      void load(location.status, location.page, { history: "none" });
+      setDraft(location.filters);
+      void load(location.status, location.page, location.filters, { history: "none" });
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, [load]);
 
+  function applyFilters(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (draft.from && draft.to && draft.from > draft.to) {
+      setError("The start date must be on or before the end date.");
+      return;
+    }
+    void load(selected, 1, { ...draft, search: draft.search.trim(), service: draft.service.trim() });
+  }
+
+  const formatDateTime = (value: string) => formatZonedDateTime(value, timeZone);
+
   return (
     <>
-      <nav className="mt-7 flex gap-2 overflow-x-auto pb-2" aria-label="Filter bookings" aria-busy={loading}>
+      <form onSubmit={applyFilters} className="mt-7 grid gap-3 border border-ink/10 bg-paper p-4 sm:p-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end" role="search">
+        <label className="block"><span className="eyebrow">Search</span><input value={draft.search} onChange={(event) => setDraft({ ...draft, search: event.target.value })} maxLength={100} placeholder="Customer, email, phone or notes" className={cn(adminInputClass, "mt-2")} /></label>
+        <label className="block"><span className="eyebrow">Service</span><select value={draft.service} onChange={(event) => setDraft({ ...draft, service: event.target.value })} className={cn(adminInputClass, "mt-2")}><option value="">All services</option>{[...new Set([...services, ...(draft.service ? [draft.service] : [])])].map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
+        <label className="block"><span className="eyebrow">From</span><input type="date" value={draft.from} onChange={(event) => setDraft({ ...draft, from: event.target.value })} className={cn(adminInputClass, "mt-2")} /></label>
+        <label className="block"><span className="eyebrow">To</span><input type="date" value={draft.to} onChange={(event) => setDraft({ ...draft, to: event.target.value })} className={cn(adminInputClass, "mt-2")} /></label>
+        <div className="flex gap-2"><button type="submit" disabled={loading} className={adminPrimaryButtonClass}>Apply</button><button type="button" disabled={loading} onClick={() => { setDraft(emptyFilters); void load(selected, 1, emptyFilters); }} className={adminSecondaryButtonClass}>Reset</button></div>
+        <p className="text-[9px] uppercase tracking-[0.14em] text-ink/35 lg:col-span-5">Dates and times in studio time · {timeZone}</p>
+      </form>
+
+      {data && error ? <p role="alert" className="mt-3 text-sm text-[#8d433b]">{error}</p> : null}
+
+      <nav className="mt-4 flex gap-2 overflow-x-auto pb-2" aria-label="Filter bookings by status" aria-busy={loading}>
         {statusOptions.map((option) => (
           <button
             key={option.value}
             type="button"
-            onClick={() => void load(option.value, 1)}
+            onClick={() => void load(option.value, 1, filters)}
             disabled={loading && selected === option.value}
             aria-pressed={selected === option.value}
             className={cn(
@@ -206,7 +247,7 @@ export function BookingsBrowser({ initialData, initialError, initialPage, initia
           <p className="eyebrow">Data unavailable</p>
           <h2 className="mt-3 font-serif text-3xl">Booking data is temporarily unavailable.</h2>
           <p className="mt-3 max-w-xl leading-6 text-ink/55">{error ?? "The studio connection did not respond. Please try again."} Your bookings are safe.</p>
-          <button type="button" onClick={() => void load(selected, page, { force: true })} disabled={loading} className="mt-6 border border-ink/20 bg-paper px-5 py-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink disabled:cursor-wait disabled:opacity-60">Try again</button>
+          <button type="button" onClick={() => void load(selected, page, filters, { force: true })} disabled={loading} className="mt-6 border border-ink/20 bg-paper px-5 py-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink disabled:cursor-wait disabled:opacity-60">Try again</button>
         </div>
       ) : data.items.length ? (
         <div className={cn("transition-opacity", loading && "pointer-events-none opacity-55")} aria-live="polite">
@@ -252,13 +293,13 @@ export function BookingsBrowser({ initialData, initialError, initialPage, initia
           <div className="mt-7 flex items-center justify-between border-t border-ink/10 pt-6">
             <p className="text-[9px] uppercase tracking-[0.16em] text-ink/40">Showing {(page - 1) * ADMIN_BOOKINGS_PAGE_SIZE + 1}–{Math.min(page * ADMIN_BOOKINGS_PAGE_SIZE, data.total)} of {data.total}</p>
             <div className="flex gap-2">
-              <button type="button" onClick={() => void load(selected, page - 1)} disabled={loading || page <= 1} className="grid h-10 w-10 place-items-center border border-ink/15 bg-paper disabled:cursor-not-allowed disabled:opacity-30" aria-label="Previous page"><ChevronLeft className="h-4 w-4" /></button>
-              <button type="button" onClick={() => void load(selected, page + 1)} disabled={loading || page * ADMIN_BOOKINGS_PAGE_SIZE >= data.total} className="grid h-10 w-10 place-items-center border border-ink/15 bg-paper disabled:cursor-not-allowed disabled:opacity-30" aria-label="Next page"><ChevronRight className="h-4 w-4" /></button>
+              <button type="button" onClick={() => void load(selected, page - 1, filters)} disabled={loading || page <= 1} className="grid h-10 w-10 place-items-center border border-ink/15 bg-paper disabled:cursor-not-allowed disabled:opacity-30" aria-label="Previous page"><ChevronLeft className="h-4 w-4" /></button>
+              <button type="button" onClick={() => void load(selected, page + 1, filters)} disabled={loading || page * ADMIN_BOOKINGS_PAGE_SIZE >= data.total} className="grid h-10 w-10 place-items-center border border-ink/15 bg-paper disabled:cursor-not-allowed disabled:opacity-30" aria-label="Next page"><ChevronRight className="h-4 w-4" /></button>
             </div>
           </div>
         </div>
       ) : (
-        <div className="mt-6 border border-ink/10 bg-paper px-7 py-16 text-center"><p className="font-serif text-3xl">No bookings found.</p><p className="mt-3 text-sm text-ink/45">There are no booking requests in this view.</p></div>
+        <div className="mt-6 border border-ink/10 bg-paper px-7 py-16 text-center"><p className="font-serif text-3xl">No bookings found.</p><p className="mt-3 text-sm text-ink/45">There are no booking requests in this view.</p>{error ? <p role="alert" className="mt-3 text-sm text-[#8d433b]">{error}</p> : null}</div>
       )}
     </>
   );

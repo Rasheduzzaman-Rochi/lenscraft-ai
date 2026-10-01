@@ -47,7 +47,14 @@ AGENT_COMPANY_ID=existing-company-uuid
 ```
 
 No credentials are committed. Only an API key marked for webhook verification in
-Retell should be used. Configure the Retell agent webhook URL as:
+Retell should be used.
+
+> **Architecture note.** FastAPI must not sit in the voice-agent runtime path. This
+> webhook is optional post-call logging, not a Conversation Flow operation. Only
+> configure it if post-call records in FastAPI are wanted; voice calls work
+> without it.
+
+Configure the Retell agent webhook URL as:
 
 ```text
 https://api.example.com/api/v1/retell/webhook

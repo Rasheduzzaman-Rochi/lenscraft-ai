@@ -57,6 +57,8 @@ function normalizeLead(value: unknown): AdminLead | null {
       ? source.estimated_value
       : null,
     created_at: createdAt,
+    updated_at: dateText(source.updated_at),
+    customer_id: text(source.customer_id),
     project_details: record(source.project_details),
   };
 }
@@ -108,6 +110,8 @@ export function normalizeAdminDashboard(value: unknown): AdminDashboard {
       conversion_rate: numberValue(leads.conversion_rate ?? source.conversion_rate),
     },
     recent_leads: recentLeads,
+    customers: numberValue(source.customers),
+    active_services: numberValue(source.active_services),
   };
 }
 

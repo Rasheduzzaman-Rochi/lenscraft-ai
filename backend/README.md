@@ -15,7 +15,9 @@ The [knowledge and RAG foundation](../docs/rag.md) stores tenant documents and
 supports full-text or pgvector retrieval without selecting an embedding provider.
 The [Retell webhook foundation](../docs/retell-webhook.md) authenticates and
 normalizes voice-call events before handing final transcripts to agent services.
-The [Retell custom tools](../docs/retell-tools.md) expose authenticated service
+The voice agent does not call FastAPI: Retell's Conversation Flow calls Supabase
+RPCs directly. FastAPI serves the Admin Dashboard (`/api/v1/admin`) and the
+website `/booking` and `/contact` forms. The [Retell custom tools](../docs/retell-tools.md) expose authenticated service
 search, quote, lead, and knowledge operations for live conversations.
 
 ## Install and run locally

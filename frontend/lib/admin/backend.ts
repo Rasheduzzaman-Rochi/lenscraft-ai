@@ -16,6 +16,8 @@ export class AdminBackendError extends Error {
   constructor(
     public readonly status: number,
     public readonly code: "configuration" | "network" | "upstream-configuration" | "upstream-auth" | "upstream" | "invalid-response",
+    /** Sanitized FastAPI message, used only for business-rule 404/409/422 responses. */
+    public readonly detail?: string,
   ) {
     super("Admin backend request failed");
     this.name = "AdminBackendError";
@@ -96,22 +98,36 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       : response.status === 401 || response.status === 403
         ? "upstream-auth"
         : "upstream";
-    throw new AdminBackendError(response.status, code);
+    throw new AdminBackendError(response.status, code, detail);
   }
   return payload as T;
 }
+
+export { request as adminBackendRequest };
 
 export function getAdminDashboard() {
   return request<unknown>("/api/v1/admin/dashboard").then(normalizeAdminDashboard);
 }
 
-export function getAdminBookings(options: { status?: BookingStatus; limit?: number; offset?: number } = {}) {
+export type AdminBookingFilters = {
+  status?: BookingStatus;
+  search?: string;
+  service?: string;
+  dateFrom?: string;
+  dateTo?: string;
+};
+
+export function getAdminBookings(options: AdminBookingFilters & { limit?: number; offset?: number } = {}) {
   const defaults = { limit: options.limit ?? 50, offset: options.offset ?? 0 };
   const query = new URLSearchParams({
     limit: String(options.limit ?? 50),
     offset: String(options.offset ?? 0),
   });
   if (options.status) query.set("status", options.status);
+  if (options.search) query.set("search", options.search);
+  if (options.service) query.set("service", options.service);
+  if (options.dateFrom) query.set("date_from", options.dateFrom);
+  if (options.dateTo) query.set("date_to", options.dateTo);
   return request<unknown>(`/api/v1/admin/bookings?${query}`)
     .then((value) => normalizeAdminBookingList(value, defaults));
 }
@@ -144,12 +160,14 @@ export function deleteAdminBooking(bookingId: string) {
   );
 }
 
-export function getAdminLeads(options: { limit?: number; offset?: number } = {}) {
+export function getAdminLeads(options: { limit?: number; offset?: number; status?: AdminLeadStatus; search?: string } = {}) {
   const defaults = { limit: options.limit ?? 50, offset: options.offset ?? 0 };
   const query = new URLSearchParams({
     limit: String(options.limit ?? 50),
     offset: String(options.offset ?? 0),
   });
+  if (options.status) query.set("status", options.status);
+  if (options.search) query.set("search", options.search);
   return request<unknown>(`/api/v1/admin/leads?${query}`)
     .then((value) => normalizeAdminLeadList(value, defaults));
 }
@@ -168,6 +186,18 @@ export function deleteAdminLead(leadId: string) {
     `/api/v1/admin/leads/${encodeURIComponent(leadId)}`,
     { method: "DELETE" },
   );
+}
+
+export function updateAdminLead(leadId: string, payload: Record<string, unknown>) {
+  return request<unknown>(`/api/v1/admin/leads/${encodeURIComponent(leadId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then((value) => {
+    const lead = normalizeAdminLead(value);
+    if (!lead) throw new AdminBackendError(502, "invalid-response");
+    return lead;
+  });
 }
 
 export function updateAdminLeadStatus(leadId: string, status: AdminLeadStatus) {

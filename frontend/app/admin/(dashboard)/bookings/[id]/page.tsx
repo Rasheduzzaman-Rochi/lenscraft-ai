@@ -5,11 +5,10 @@ import { BookingActions } from "@/components/admin/booking-actions";
 import { DeleteAdminRecord } from "@/components/admin/delete-admin-record";
 import { RetryButton } from "@/components/admin/retry-button";
 import { AdminBackendError, getAdminBooking } from "@/lib/admin/backend";
+import { getAdminDisplaySettings } from "@/lib/admin/records";
+import { formatDateTime as formatZonedDateTime } from "@/lib/admin/time";
 import type { BookingStatus } from "@/lib/admin/types";
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dhaka", timeZoneName: "short" }).format(new Date(value));
-}
 
 function StatusBadge({ status }: { status: BookingStatus }) {
   return <span className={`inline-flex px-3 py-2 text-[8px] font-semibold uppercase tracking-[0.16em] ${status === "confirmed" ? "bg-[#dce8db] text-[#39523a]" : status === "pending" ? "bg-[#eee3cc] text-[#765b2c]" : status === "rejected" ? "bg-[#eedbd7] text-[#7b4038]" : "bg-ink/5 text-ink/45"}`}>{status}</span>;
@@ -17,7 +16,11 @@ function StatusBadge({ status }: { status: BookingStatus }) {
 
 export default async function BookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const result = await getAdminBooking(id).then((value) => ({ value })).catch((error) => ({ error }));
+  const [result, display] = await Promise.all([
+    getAdminBooking(id).then((value) => ({ value })).catch((error) => ({ error })),
+    getAdminDisplaySettings(),
+  ]);
+  const formatDateTime = (value: string) => formatZonedDateTime(value, display.timeZone);
   if (!("value" in result)) {
     const notFound = result.error instanceof AdminBackendError && result.error.status === 404;
     return <div className="mx-auto max-w-4xl"><Link href="/admin/bookings" className="inline-flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink/45 hover:text-ink"><ArrowLeft className="h-3.5 w-3.5" /> Back to bookings</Link><div className="mt-10 border border-[#b36a60]/30 bg-[#b36a60]/10 p-8"><p className="eyebrow text-[#85483f]">{notFound ? "Not found" : "Data unavailable"}</p><h1 className="mt-3 font-serif text-4xl">{notFound ? "Booking not found." : "Booking details could not be loaded."}</h1><p className="mt-4 text-sm leading-6 text-ink/55">{notFound ? "This booking may have been removed or belongs to another studio." : "The studio connection did not respond."}</p>{!notFound ? <div className="mt-6"><RetryButton /></div> : null}</div></div>;

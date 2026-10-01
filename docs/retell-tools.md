@@ -1,4 +1,12 @@
-# Retell custom tools
+# Retell custom tools (legacy for the voice agent)
+
+> **Architecture note.** The production voice agent does **not** use these routes.
+> The Retell Conversation Flow calls Supabase RPCs directly; do not point Retell
+> custom functions at FastAPI. These routes remain deployed only because the
+> website's `/booking` and `/contact` forms use `create-booking`,
+> `check-booking-availability`, and `create-lead`. `search-service`,
+> `calculate-quote`, `get-booking-status`, and `search-knowledge` currently have
+> no caller in this repository.
 
 LensCraft exposes these production routes for Retell custom functions:
 

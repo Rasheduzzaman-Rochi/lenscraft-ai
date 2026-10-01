@@ -1,6 +1,9 @@
 "use client";
 
-import { CalendarDays, LayoutDashboard, LogOut, Menu, Settings, UserRound, Users, X } from "lucide-react";
+import {
+  BookOpenText, BriefcaseBusiness, CalendarDays, Camera, Contact, LayoutDashboard, LogOut, Menu, ReceiptText,
+  Settings, UserRound, Users, X,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -10,11 +13,20 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
 const links = [
-  { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/services", label: "Services", icon: Camera },
+  { href: "/admin/pricing", label: "Pricing", icon: ReceiptText },
   { href: "/admin/bookings", label: "Bookings", icon: CalendarDays },
+  { href: "/admin/customers", label: "Customers", icon: Contact },
   { href: "/admin/leads", label: "Leads", icon: Users },
+  { href: "/admin/projects", label: "Projects", icon: BriefcaseBusiness },
+  { href: "/admin/knowledge", label: "Knowledge Base", icon: BookOpenText },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
+
+function isActive(pathname: string, href: string) {
+  return href === "/admin" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -55,15 +67,16 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </Link>
             <button type="button" onClick={() => setOpen(false)} className="lg:hidden" aria-label="Close navigation"><X className="h-5 w-5" /></button>
           </div>
-          <p className="mt-10 border-y border-paper/10 py-5 text-[9px] uppercase leading-5 tracking-[0.18em] text-paper/35">Studio operations<br />Private workspace</p>
+          <p className="mt-8 border-y border-paper/10 py-4 text-[9px] uppercase leading-5 tracking-[0.18em] text-paper/35">Studio operations<br />Private workspace</p>
 
-          <nav className="mt-8 space-y-2" aria-label="Admin navigation">
+          <nav className="-mx-2 mt-6 min-h-0 flex-1 space-y-1 overflow-y-auto px-2" aria-label="Admin navigation">
             {links.map(({ href, label, icon: Icon }) => {
-              const active = pathname === href;
+              const active = isActive(pathname, href);
               return (
                 <Link
                   key={href}
                   href={href}
+                  aria-current={active ? "page" : undefined}
                   onClick={() => setOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] transition",
@@ -76,7 +89,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          <div className="mt-auto border-t border-paper/10 pt-6">
+          <div className="mt-4 border-t border-paper/10 pt-4">
             <button
               type="button"
               onClick={logout}

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { adminConnectionMessage, adminProxyStatus, deleteAdminLead, getAdminLead } from "@/lib/admin/backend";
+import { adminConnectionMessage, adminProxyStatus, deleteAdminLead, getAdminLead, updateAdminLead } from "@/lib/admin/backend";
+import { adminRoute, readBody, recordId } from "@/lib/admin/route";
 import { hasAdminSession } from "@/lib/admin/session";
 
 export const runtime = "nodejs";
@@ -44,4 +45,11 @@ export async function DELETE(
         : adminConnectionMessage(error);
     return NextResponse.json({ message }, { status, headers: { "Cache-Control": "no-store" } });
   }
+}
+
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+  return adminRoute(
+    async () => updateAdminLead(await recordId(context), await readBody(request)),
+    { notFound: "Lead not found." },
+  );
 }

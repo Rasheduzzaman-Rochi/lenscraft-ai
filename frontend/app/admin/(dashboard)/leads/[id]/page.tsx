@@ -1,17 +1,79 @@
-import { ArrowLeft, Mail, Phone } from "lucide-react";
+import { Mail, Phone } from "lucide-react";
 import Link from "next/link";
 
-import { RetryButton } from "@/components/admin/retry-button";
-import { LeadActions } from "@/components/admin/lead-actions";
 import { DeleteAdminRecord } from "@/components/admin/delete-admin-record";
-import { AdminBackendError, getAdminLead } from "@/lib/admin/backend";
+import { LeadActions } from "@/components/admin/lead-actions";
+import { LeadEditForm } from "@/components/admin/lead-edit-form";
+import { BackLink, Badge, DetailItem, ErrorPanel, Panel } from "@/components/admin/ui";
+import { AdminBackendError, adminConnectionMessage, getAdminLead } from "@/lib/admin/backend";
+import { getAdminDisplaySettings } from "@/lib/admin/records";
+import { formatDate, formatMoney } from "@/lib/admin/time";
 
-function formatDate(value: string) { return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(value)); }
+function projectValue(details: Record<string, unknown>, key: string) {
+  const value = details[key];
+  return value === null || value === undefined || value === "" ? null : String(value);
+}
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const result = await getAdminLead(id).then((value) => ({ value })).catch((error) => ({ error }));
-  if (!("value" in result)) { const notFound = result.error instanceof AdminBackendError && result.error.status === 404; return <div className="mx-auto max-w-4xl"><Link href="/admin/leads" className="inline-flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink/45 hover:text-ink"><ArrowLeft className="h-3.5 w-3.5" /> Back to leads</Link><div className="mt-10 border border-[#b36a60]/30 bg-[#b36a60]/10 p-8"><h1 className="font-serif text-4xl">{notFound ? "Lead not found." : "Lead details could not be loaded."}</h1><p className="mt-4 text-sm text-ink/55">{notFound ? "This enquiry is no longer available." : "The studio connection did not respond."}</p>{!notFound ? <div className="mt-6"><RetryButton /></div> : null}</div></div>; }
+  const [result, display] = await Promise.all([
+    getAdminLead(id).then((value) => ({ value }), (error: unknown) => ({ error })),
+    getAdminDisplaySettings(),
+  ]);
+  if (!("value" in result)) {
+    const notFound = result.error instanceof AdminBackendError && result.error.status === 404;
+    return (
+      <div className="mx-auto max-w-4xl">
+        <BackLink href="/admin/leads" label="Back to leads" />
+        <ErrorPanel title={notFound ? "Lead not found." : "Lead details could not be loaded."} message={notFound ? "This enquiry is no longer available." : adminConnectionMessage(result.error)} retry={!notFound} />
+      </div>
+    );
+  }
+
   const lead = result.value;
-  return <div className="mx-auto max-w-5xl"><Link href="/admin/leads" className="inline-flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink/45 hover:text-ink"><ArrowLeft className="h-3.5 w-3.5" /> Back to leads</Link><div className="mt-8 flex flex-col gap-5 border-b border-ink/10 pb-8 sm:flex-row sm:items-end sm:justify-between"><div><p className="eyebrow">Lead detail</p><h1 className="mt-3 font-serif text-5xl">{lead.customer_name ?? "Unassigned enquiry"}</h1><p className="mt-3 text-sm text-ink/50">Received {formatDate(lead.created_at)}</p></div><span className="bg-bone px-3 py-2 text-[8px] font-semibold uppercase tracking-[0.16em] text-ink/55">{lead.status}</span></div><div className="mt-8 grid gap-6 lg:grid-cols-2"><section className="border border-ink/10 bg-paper p-6 sm:p-8"><p className="eyebrow">Contact</p><dl className="mt-6 space-y-5 text-sm"><div><dt className="eyebrow">Email</dt><dd className="mt-2"><a href={lead.email ? `mailto:${lead.email}` : undefined} className="inline-flex items-center gap-2 text-bronze hover:text-ink"><Mail className="h-3.5 w-3.5" />{lead.email ?? "Not supplied"}</a></dd></div><div><dt className="eyebrow">Phone</dt><dd className="mt-2"><a href={lead.phone ? `tel:${lead.phone}` : undefined} className="inline-flex items-center gap-2 text-bronze hover:text-ink"><Phone className="h-3.5 w-3.5" />{lead.phone ?? "Not supplied"}</a></dd></div></dl></section><section className="border border-ink/10 bg-paper p-6 sm:p-8"><p className="eyebrow">Project</p><dl className="mt-6 space-y-5 text-sm"><div><dt className="eyebrow">Service interest</dt><dd className="mt-2 font-serif text-2xl">{lead.service ?? "Not specified"}</dd></div><div><dt className="eyebrow">Intent / notes</dt><dd className="mt-2 leading-6 text-ink/60">{lead.intent ?? "No notes supplied."}</dd></div><div><dt className="eyebrow">Business context</dt><dd className="mt-2 leading-6 text-ink/60">{Object.entries(lead.project_details).filter(([key]) => key !== "id").map(([key, value]) => `${key.replaceAll("_", " ")}: ${String(value)}`).join(" · ") || "No project details supplied."}</dd></div></dl></section></div><LeadActions leadId={lead.id} status={lead.status} /><DeleteAdminRecord id={lead.id} resource="lead" /></div>;
+  const project = lead.project_details;
+  const projectId = projectValue(project, "id");
+  const deadline = projectValue(project, "deadline");
+  return (
+    <div className="mx-auto max-w-5xl">
+      <BackLink href="/admin/leads" label="Back to leads" />
+      <div className="mt-8 flex flex-col gap-5 border-b border-ink/10 pb-8 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="eyebrow">Lead detail</p>
+          <h1 className="mt-3 break-words font-serif text-4xl sm:text-5xl">{lead.customer_name ?? "Unassigned enquiry"}</h1>
+          <p className="mt-3 text-sm text-ink/50">Received {formatDate(lead.created_at, display.timeZone)}{lead.source ? ` · via ${lead.source}` : ""}</p>
+        </div>
+        <Badge>{lead.status}</Badge>
+      </div>
+
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <Panel eyebrow="Customer">
+          {lead.customer_id ? <Link href={`/admin/customers/${lead.customer_id}`} className="mt-3 block font-serif text-2xl hover:text-bronze">{lead.customer_name ?? "View customer"}</Link> : <p className="mt-3 text-sm text-ink/45">No customer linked.</p>}
+          <dl className="mt-6 space-y-5">
+            <DetailItem label="Email">{lead.email ? <a href={`mailto:${lead.email}`} className="inline-flex items-center gap-2 text-bronze hover:text-ink"><Mail className="h-3.5 w-3.5" />{lead.email}</a> : "Not supplied"}</DetailItem>
+            <DetailItem label="Phone">{lead.phone ? <a href={`tel:${lead.phone}`} className="inline-flex items-center gap-2 text-bronze hover:text-ink"><Phone className="h-3.5 w-3.5" />{lead.phone}</a> : "Not supplied"}</DetailItem>
+            <DetailItem label="Business">{[lead.business_name, lead.industry].filter(Boolean).join(" · ") || "Not supplied"}</DetailItem>
+          </dl>
+        </Panel>
+        <Panel eyebrow="Latest project">
+          {projectId ? (
+            <>
+              <Link href={`/admin/projects/${projectId}`} className="mt-3 block font-serif text-2xl hover:text-bronze">{lead.service ?? "Unspecified service"}</Link>
+              <dl className="mt-6 grid gap-5 sm:grid-cols-2">
+                <DetailItem label="Category">{projectValue(project, "product_category") ?? "—"}</DetailItem>
+                <DetailItem label="Products / images">{projectValue(project, "product_count") ?? "—"} / {projectValue(project, "image_count") ?? "—"}</DetailItem>
+                <DetailItem label="Deadline">{deadline ? formatDate(deadline, display.timeZone) : "—"}</DetailItem>
+                <DetailItem label="Status">{projectValue(project, "status") ?? "—"}</DetailItem>
+              </dl>
+            </>
+          ) : <p className="mt-3 text-sm text-ink/45">No project recorded for this customer.</p>}
+          <dl className="mt-6"><DetailItem label="Estimated value">{lead.estimated_value != null ? formatMoney(lead.estimated_value, display.currency) : "Not estimated"}</DetailItem></dl>
+        </Panel>
+      </div>
+
+      <Panel eyebrow="Recorded intent" className="mt-6"><LeadEditForm lead={lead} currency={display.currency} /></Panel>
+      <LeadActions leadId={lead.id} status={lead.status} />
+      <DeleteAdminRecord id={lead.id} resource="lead" />
+    </div>
+  );
 }

@@ -17,6 +17,21 @@ function integerParameter(value: string | null, fallback: number, minimum: numbe
   return parsed;
 }
 
+function textParameter(value: string | null, maximum: number) {
+  const normalized = value?.trim();
+  if (!normalized) return undefined;
+  if (normalized.length > maximum) throw new Error("Text parameter is too long");
+  return normalized;
+}
+
+function instantParameter(value: string | null) {
+  if (!value) return undefined;
+  if (!/(?:Z|[+-]\d{2}:\d{2})$/.test(value) || Number.isNaN(Date.parse(value))) {
+    throw new Error("Invalid date parameter");
+  }
+  return value;
+}
+
 export async function POST(request: Request) {
   if (!(await hasAdminSession())) return NextResponse.json({ message: "Authentication required." }, { status: 401 });
   try {
@@ -50,6 +65,10 @@ export async function GET(request: Request) {
     }
     const bookings = await getAdminBookings({
       status: rawStatus as BookingStatus | undefined,
+      search: textParameter(search.get("search"), 100),
+      service: textParameter(search.get("service"), 200),
+      dateFrom: instantParameter(search.get("date_from")),
+      dateTo: instantParameter(search.get("date_to")),
       limit: integerParameter(search.get("limit"), 50, 1, 100),
       offset: integerParameter(search.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER),
     });

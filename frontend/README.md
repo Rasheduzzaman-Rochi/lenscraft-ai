@@ -17,9 +17,19 @@ values, FastAPI origin, server-only admin API key, and fixed company UUID.
 `ADMIN_API_KEY` must match the backend deployment and must never use a
 `NEXT_PUBLIC_` prefix.
 
-The voice assistant requires the public `NEXT_PUBLIC_RETELL_AGENT_ID` and the
-server-only `RETELL_API_KEY`. The API key must only be configured on the running
-Next.js service.
+The voice assistant talks to Retell directly and never uses FastAPI:
+
+```text
+Browser -> /api/voice/session -> Retell create-web-call (access token)
+Browser -> Retell -> Retell Conversation Flow -> Supabase RPCs
+```
+
+`/api/voice/session` is a Next.js route that only creates the Retell web-call
+access token required by `retell-client-js-sdk`; it performs no service search,
+FAQ, quote, lead, availability, booking, or booking-status work. It needs the
+production `NEXT_PUBLIC_RETELL_AGENT_ID` and the server-only `RETELL_API_KEY`,
+configured on the running Next.js service. The Retell custom-function secret
+stays in Retell and never belongs in this service.
 
 ## Production build
 
@@ -44,14 +54,22 @@ its container environment.
 - `/contact` — project enquiry form foundation
 - `/booking` — booking request form foundation
 - `/admin` — authenticated studio overview
-- `/admin/bookings` — authenticated booking operations
-- `/admin/leads` — authenticated lead operations
+- `/admin/services`, `/admin/pricing` — service catalog and pricing rules
+- `/admin/bookings`, `/admin/customers`, `/admin/leads`, `/admin/projects` — operations
+- `/admin/knowledge` — voice-agent knowledge base documents
+- `/admin/settings` — studio settings, profile, and sign out
 
 The current visual placeholders are CSS-generated and have no external image
 dependency. Replace them with optimized `next/image` assets when approved studio
 photography becomes available.
 
-Browser forms submit to same-origin Next.js route handlers. Those handlers
-validate input, add the trusted company UUID, sign the exact request body on the
-server, and call the existing FastAPI Retell-tool endpoints. Supabase credentials
-remain in the backend, and the Retell key is never included in browser code.
+The `/booking` and `/contact` forms (not the voice agent) submit to same-origin
+Next.js route handlers. Those handlers validate input, add the trusted company
+UUID, sign the exact request body on the server, and call FastAPI's
+`create-booking`, `check-booking-availability`, and `create-lead` endpoints.
+This is a deliberate website-forms-only path; the voice agent does not use it.
+Supabase credentials remain in the backend, and the Retell key is never included
+in browser code.
+
+The Admin Dashboard uses `Admin browser -> Next.js admin routes (Supabase Auth +
+admin role) -> FastAPI /api/v1/admin -> Supabase`.

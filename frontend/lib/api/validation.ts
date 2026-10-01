@@ -5,12 +5,12 @@ export class RequestValidationError extends Error {
   }
 }
 
-export async function readJsonObject(request: Request): Promise<Record<string, unknown>> {
+export async function readJsonObject(request: Request, maxBytes = 24_000): Promise<Record<string, unknown>> {
   if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
     throw new RequestValidationError();
   }
   const text = await request.text();
-  if (!text || new TextEncoder().encode(text).byteLength > 24_000) {
+  if (!text || new TextEncoder().encode(text).byteLength > maxBytes) {
     throw new RequestValidationError();
   }
   try {
