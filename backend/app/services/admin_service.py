@@ -1,5 +1,6 @@
 """Internal administration orchestration."""
 
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -40,11 +41,19 @@ class AdminService:
         limit: int,
         offset: int,
         status: BookingStatus | None,
+        search: str | None = None,
+        service: str | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
     ) -> AdminBookingList:
         rows, total = await self.repository.list_bookings(
             limit=limit,
             offset=offset,
             status=status,
+            search=search,
+            service=service,
+            date_from=date_from,
+            date_to=date_to,
         )
         try:
             return AdminBookingList(
@@ -60,11 +69,14 @@ class AdminService:
         counts = await self.repository.booking_counts()
         lead_stats = await self.repository.lead_stats()
         leads = await self.repository.recent_leads()
+        record_counts = await self.repository.record_counts()
         try:
             return AdminDashboard(
                 bookings=AdminBookingStats.model_validate(counts),
-            leads=AdminLeadStats.model_validate(lead_stats),
+                leads=AdminLeadStats.model_validate(lead_stats),
                 recent_leads=[AdminLead.model_validate(row) for row in leads],
+                customers=record_counts["customers"],
+                active_services=record_counts["active_services"],
             )
         except ValidationError:
             raise AdminDataError("Stored dashboard data is invalid") from None
@@ -78,8 +90,17 @@ class AdminService:
         except ValidationError:
             raise AdminDataError("Stored booking data is invalid") from None
 
-    async def list_leads(self, *, limit: int, offset: int) -> AdminLeadList:
-        rows, total = await self.repository.list_leads(limit=limit, offset=offset)
+    async def list_leads(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        status: str | None = None,
+        search: str | None = None,
+    ) -> AdminLeadList:
+        rows, total = await self.repository.list_leads(
+            limit=limit, offset=offset, status=status, search=search,
+        )
         try:
             return AdminLeadList(
                 items=[AdminLead.model_validate(row) for row in rows],

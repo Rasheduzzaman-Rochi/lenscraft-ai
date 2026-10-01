@@ -1,9 +1,11 @@
 """Tenant-scoped read queries for the internal administration surface."""
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from app.repositories.admin_records_repository import search_term
 from app.repositories.base import BaseRepository, Record, pagination
 from app.repositories.errors import RepositoryError
 from app.schemas.booking import BookingStatus
@@ -27,15 +29,36 @@ class AdminRepository(BaseRepository):
             if row.get("id") is not None
         }
 
+    def _matching_customer_ids(self, client, term: str) -> list[str]:
+        """Return up to 100 tenant customers whose contact fields contain a sanitized term."""
+        rows = self._rows(
+            client.table("customers")
+            .select("id")
+            .eq("company_id", self.company_id)
+            .or_(",".join(
+                f"{column}.ilike.*{term}*"
+                for column in ("name", "email", "phone", "business_name")
+            ))
+            .limit(100)
+            .execute()
+        )
+        return [str(row["id"]) for row in rows if row.get("id")]
+
     async def list_bookings(
         self,
         *,
         limit: int = 50,
         offset: int = 0,
         status: BookingStatus | None = None,
+        search: str | None = None,
+        service: str | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
     ) -> tuple[list[Record], int]:
         """Return a bounded booking page with tenant-owned customer contacts."""
         first, last = pagination(limit, offset)
+        term = search_term(search)
+        service_name = search_term(service)
 
         def execute(client) -> tuple[list[Record], int]:
             query = (
@@ -48,6 +71,18 @@ class AdminRepository(BaseRepository):
             )
             if status is not None:
                 query = query.eq("status", status.value)
+            if service_name:
+                query = query.ilike("service_type", service_name)
+            if date_from is not None:
+                query = query.gte("date_time", date_from.isoformat())
+            if date_to is not None:
+                query = query.lt("date_time", date_to.isoformat())
+            if term:
+                clauses = [f"service_type.ilike.*{term}*", f"notes.ilike.*{term}*"]
+                customer_ids = self._matching_customer_ids(client, term)
+                if customer_ids:
+                    clauses.append(f"customer_id.in.({','.join(customer_ids)})")
+                query = query.or_(",".join(clauses))
             response = query.order("date_time", desc=True).range(first, last).execute()
             bookings = self._rows(response)
             total = self._exact_count(response)
@@ -153,6 +188,30 @@ class AdminRepository(BaseRepository):
 
         return await self._run(execute)
 
+    async def record_counts(self) -> dict[str, int]:
+        """Return exact customer and active service counts for this company."""
+
+        def execute(client) -> dict[str, int]:
+            customers = (
+                client.table("customers")
+                .select("id", count="exact", head=True)
+                .eq("company_id", self.company_id)
+                .execute()
+            )
+            services = (
+                client.table("services")
+                .select("id", count="exact", head=True)
+                .eq("company_id", self.company_id)
+                .eq("is_active", True)
+                .execute()
+            )
+            return {
+                "customers": self._exact_count(customers),
+                "active_services": self._exact_count(services),
+            }
+
+        return await self._run(execute)
+
     async def lead_stats(self) -> dict[str, int | Decimal | float]:
         """Return tenant-scoped lead volume, value, and conversion metrics."""
         def execute(client) -> dict[str, int | Decimal | float]:
@@ -231,19 +290,33 @@ class AdminRepository(BaseRepository):
 
         return await self._run(execute)
 
-    async def list_leads(self, *, limit: int = 50, offset: int = 0) -> tuple[list[Record], int]:
+    async def list_leads(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        status: str | None = None,
+        search: str | None = None,
+    ) -> tuple[list[Record], int]:
         """Return bounded tenant-scoped leads with customer and project details."""
         first, last = pagination(limit, offset)
+        term = search_term(search)
 
         def execute(client) -> tuple[list[Record], int]:
-            response = (
+            query = (
                 client.table("leads")
                 .select("id,customer_id,status,source,intent,estimated_value,created_at", count="exact")
                 .eq("company_id", self.company_id)
-                .order("created_at", desc=True)
-                .range(first, last)
-                .execute()
             )
+            if status is not None:
+                query = query.eq("status", status)
+            if term:
+                clauses = [f"intent.ilike.*{term}*", f"source.ilike.*{term}*"]
+                customer_ids = self._matching_customer_ids(client, term)
+                if customer_ids:
+                    clauses.append(f"customer_id.in.({','.join(customer_ids)})")
+                query = query.or_(",".join(clauses))
+            response = query.order("created_at", desc=True).range(first, last).execute()
             leads = self._rows(response)
             total = self._exact_count(response)
             customer_ids = sorted({str(row["customer_id"]) for row in leads if row.get("customer_id")})
@@ -297,7 +370,7 @@ class AdminRepository(BaseRepository):
         def execute(client) -> Record | None:
             lead = self._one(
                 client.table("leads")
-                .select("id,customer_id,status,source,intent,estimated_value,created_at")
+                .select("id,customer_id,status,source,intent,estimated_value,created_at,updated_at")
                 .eq("company_id", self.company_id)
                 .eq("id", lead_id)
                 .limit(1)
@@ -305,24 +378,27 @@ class AdminRepository(BaseRepository):
             )
             if lead is None:
                 return None
-            customer = self._one(
-                client.table("customers")
-                .select("id,name,email,phone,business_name,industry")
-                .eq("company_id", self.company_id)
-                .eq("id", lead["customer_id"])
-                .limit(1)
-                .execute(),
-                required=True,
-            )
-            project = self._one(
-                client.table("projects")
-                .select("id,service_type,product_category,product_count,image_count,deadline,status")
-                .eq("company_id", self.company_id)
-                .eq("customer_id", lead["customer_id"])
-                .order("created_at", desc=True)
-                .limit(1)
-                .execute(),
-            ) or {}
+            customer: Record = {}
+            project: Record = {}
+            if lead.get("customer_id") is not None:
+                customer = self._one(
+                    client.table("customers")
+                    .select("id,name,email,phone,business_name,industry")
+                    .eq("company_id", self.company_id)
+                    .eq("id", lead["customer_id"])
+                    .limit(1)
+                    .execute(),
+                    required=True,
+                )
+                project = self._one(
+                    client.table("projects")
+                    .select("id,service_type,product_category,product_count,image_count,deadline,status")
+                    .eq("company_id", self.company_id)
+                    .eq("customer_id", lead["customer_id"])
+                    .order("created_at", desc=True)
+                    .limit(1)
+                    .execute(),
+                ) or {}
             return {
                 "id": lead.get("id"),
                 "customer_id": lead.get("customer_id"),
@@ -336,6 +412,7 @@ class AdminRepository(BaseRepository):
                 "intent": lead.get("intent"),
                 "estimated_value": lead.get("estimated_value"),
                 "created_at": lead.get("created_at"),
+                "updated_at": lead.get("updated_at"),
                 "service": project.get("service_type"),
                 "project_details": project,
             }

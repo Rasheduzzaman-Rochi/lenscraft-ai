@@ -50,6 +50,8 @@ class AdminLead(BaseModel):
     industry: str | None = Field(default=None, max_length=200)
     service: str | None = Field(default=None, max_length=500)
     project_details: dict[str, object] = Field(default_factory=dict)
+    customer_id: UUID | None = None
+    updated_at: AwareDatetime | None = None
 
 
 class AdminLeadList(BaseModel):
@@ -102,3 +104,5 @@ class AdminDashboard(BaseModel):
     bookings: AdminBookingStats
     leads: AdminLeadStats = Field(default_factory=AdminLeadStats)
     recent_leads: list[AdminLead]
+    customers: int = Field(default=0, ge=0)
+    active_services: int = Field(default=0, ge=0)

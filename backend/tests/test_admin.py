@@ -98,6 +98,10 @@ class AdminReadApiTests(unittest.TestCase):
             limit=25,
             offset=0,
             status=BookingStatus.PENDING,
+            search=None,
+            service=None,
+            date_from=None,
+            date_to=None,
         )
 
         with self.client() as client:
@@ -136,7 +140,7 @@ class AdminReadApiTests(unittest.TestCase):
                 )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["items"][0]["id"], str(lead.id))
-        method.assert_awaited_once_with(limit=50, offset=0)
+        method.assert_awaited_once_with(limit=50, offset=0, status=None, search=None)
 
     def test_admin_can_delete_company_booking_and_lead(self):
         for resource, method_name in (("bookings", "delete_booking"), ("leads", "delete_lead")):

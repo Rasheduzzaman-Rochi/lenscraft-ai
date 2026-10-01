@@ -15,3 +15,7 @@ class RepositoryConflictError(RepositoryError):
 
 class RepositoryIntegrityError(RepositoryError):
     """A foreign key or database check constraint rejected the operation."""
+
+
+class RecordChangedError(RepositoryConflictError):
+    """The record changed after the caller loaded it; the update was not applied."""

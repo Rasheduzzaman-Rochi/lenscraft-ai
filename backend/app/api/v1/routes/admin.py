@@ -1,14 +1,16 @@
 """Authenticated internal administration read routes."""
 
 import logging
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from pydantic import AwareDatetime
 
 from app.core.security import require_admin_auth
 from app.repositories.booking_repository import BookingRepository
 from app.repositories.errors import (
+    RecordChangedError,
     RecordNotFoundError,
     RepositoryConflictError,
     RepositoryError,
@@ -24,14 +26,17 @@ from app.schemas.admin import (
     AdminLeadList,
     AdminLeadStatusUpdate,
 )
+from app.schemas.admin_records import AdminLeadUpdate
 from app.schemas.booking import BookingStatus
 from app.schemas.tools import CreateBookingResponse
+from app.services.admin_records_service import AdminRecordsService
 from app.services.admin_service import AdminDataError, AdminService
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 logger = logging.getLogger(__name__)
 AdminAuthDependency = Annotated[None, Depends(require_admin_auth)]
+STALE_RECORD_MESSAGE = "This record changed since you opened it. Reload the page and try again."
 
 
 def get_admin_service(request: Request) -> AdminService:
@@ -71,10 +76,24 @@ async def list_bookings(
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
     status: BookingStatus | None = None,
+    search: Annotated[str | None, Query(max_length=100)] = None,
+    service_type: Annotated[str | None, Query(alias="service", max_length=200)] = None,
+    date_from: AwareDatetime | None = None,
+    date_to: AwareDatetime | None = None,
 ) -> AdminBookingList:
     response.headers["Cache-Control"] = "no-store"
+    if date_from is not None and date_to is not None and date_from >= date_to:
+        raise HTTPException(422, "The start date must be before the end date.")
     try:
-        return await service.list_bookings(limit=limit, offset=offset, status=status)
+        return await service.list_bookings(
+            limit=limit,
+            offset=offset,
+            status=status,
+            search=search,
+            service=service_type,
+            date_from=date_from,
+            date_to=date_to,
+        )
     except AdminDataError:
         logger.warning("Admin booking list received invalid stored data")
         raise HTTPException(409, "Booking data is unavailable.") from None
@@ -132,10 +151,12 @@ async def list_leads(
     service: AdminServiceDependency,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
+    status: Literal["new", "contacted", "qualified", "converted", "lost"] | None = None,
+    search: Annotated[str | None, Query(max_length=100)] = None,
 ) -> AdminLeadList:
     response.headers["Cache-Control"] = "no-store"
     try:
-        return await service.list_leads(limit=limit, offset=offset)
+        return await service.list_leads(limit=limit, offset=offset, status=status, search=search)
     except AdminDataError:
         raise HTTPException(409, "Lead data is unavailable.") from None
     except RepositoryError:
@@ -160,6 +181,32 @@ async def get_lead(
     except RepositoryError:
         logger.warning("Admin lead query failed")
         raise HTTPException(503, "Lead data is temporarily unavailable.") from None
+
+
+@router.patch("/leads/{lead_id}", response_model=AdminLead)
+async def update_lead(
+    lead_id: UUID,
+    payload: AdminLeadUpdate,
+    response: Response,
+    _admin_auth: AdminAuthDependency,
+    service: AdminServiceDependency,
+) -> AdminLead:
+    """Update descriptive lead fields; status changes keep their dedicated endpoint."""
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        await AdminRecordsService(service.company_id).update_lead(lead_id, payload)
+        return await service.get_lead(lead_id)
+    except (RecordNotFoundError, KeyError):
+        raise HTTPException(404, "Lead not found.") from None
+    except RecordChangedError:
+        raise HTTPException(409, STALE_RECORD_MESSAGE) from None
+    except RepositoryIntegrityError:
+        raise HTTPException(422, "Lead details are invalid.") from None
+    except AdminDataError:
+        raise HTTPException(409, "Lead data is unavailable.") from None
+    except RepositoryError:
+        logger.warning("Admin lead update failed")
+        raise HTTPException(503, "Lead updates are temporarily unavailable.") from None
 
 
 @router.delete("/leads/{lead_id}", response_model=AdminDeleteResponse)
